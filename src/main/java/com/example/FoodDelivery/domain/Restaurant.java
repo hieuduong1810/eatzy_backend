@@ -3,10 +3,11 @@ package com.example.FoodDelivery.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "restaurants")
@@ -44,9 +45,7 @@ public class Restaurant {
     @Column(precision = 3, scale = 2)
     private BigDecimal averageRating;
 
-    private Instant openingTime;
-
-    private Instant closingTime;
+    private String schedule; // e.g., "09:00-21:00"
 
     @OneToMany(mappedBy = "restaurant")
     @JsonIgnore
@@ -67,4 +66,9 @@ public class Restaurant {
     @OneToMany(mappedBy = "restaurant")
     @JsonIgnore
     private List<MonthlyRevenueReport> monthlyRevenueReports;
+
+    @ManyToMany
+    @JsonIgnoreProperties("restaurants")
+    @JoinTable(name = "restaurant_restaurant_type", joinColumns = @JoinColumn(name = "restaurant_id"), inverseJoinColumns = @JoinColumn(name = "restaurant_type_id"))
+    private List<RestaurantType> restaurantTypes;
 }

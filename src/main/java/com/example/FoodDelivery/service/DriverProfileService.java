@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.example.FoodDelivery.domain.DriverProfile;
 import com.example.FoodDelivery.domain.User;
-import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.driverProfile.ResDriverProfileDTO;
+import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.repository.DriverProfileRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
