@@ -35,6 +35,8 @@ dependencies {
 	implementation("javax.activation:activation:1.1.1")
 	// Spring Mail for email verification
 	implementation("org.springframework.boot:spring-boot-starter-mail")
+	// dotenv for environment variables
+	implementation("me.paulschwarz:spring-dotenv:4.0.0")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	runtimeOnly("com.mysql:mysql-connector-j")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
