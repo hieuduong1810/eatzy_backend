@@ -3,6 +3,8 @@ package com.example.FoodDelivery.service;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -20,12 +22,18 @@ public class DishService {
     private final DishRepository dishRepository;
     private final RestaurantService restaurantService;
     private final DishCategoryService dishCategoryService;
+    private SeoService seoService;
 
     public DishService(DishRepository dishRepository, RestaurantService restaurantService,
             DishCategoryService dishCategoryService) {
         this.dishRepository = dishRepository;
         this.restaurantService = restaurantService;
         this.dishCategoryService = dishCategoryService;
+    }
+    
+    @Autowired
+    public void setSeoService(@Lazy SeoService seoService) {
+        this.seoService = seoService;
     }
 
     public boolean existsByNameAndRestaurantId(String name, Long restaurantId) {
@@ -74,6 +82,9 @@ public class DishService {
             }
             dish.setCategory(category);
         }
+
+        // Auto-generate SEO fields
+        seoService.generateDishSeo(dish);
 
         return dishRepository.save(dish);
     }

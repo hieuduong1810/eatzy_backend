@@ -27,6 +27,20 @@ public class Dish {
 
     private String name;
 
+    @Column(unique = true)
+    private String slug; // SEO-friendly URL: "bun-bo-hue-dac-biet"
+
+    @Column(length = 70)
+    private String metaTitle; // SEO title
+
+    @Column(length = 160)
+    private String metaDescription; // SEO description
+
+    @Column(columnDefinition = "TEXT")
+    private String metaKeywords; // SEO keywords: "bún bò Huế, món cay, món Huế"
+
+    private String ogImage; // Open Graph image URL (can use imageUrl if not set)
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

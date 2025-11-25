@@ -2,6 +2,8 @@ package com.example.FoodDelivery.service;
 
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -17,10 +19,16 @@ import com.example.FoodDelivery.util.error.IdInvalidException;
 public class RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final UserService userService;
+    private SeoService seoService;
 
     public RestaurantService(RestaurantRepository restaurantRepository, UserService userService) {
         this.restaurantRepository = restaurantRepository;
         this.userService = userService;
+    }
+    
+    @Autowired
+    public void setSeoService(@Lazy SeoService seoService) {
+        this.seoService = seoService;
     }
 
     public boolean existsByName(String name) {
@@ -44,6 +52,10 @@ public class RestaurantService {
             }
             restaurant.setOwner(owner);
         }
+        
+        // Auto-generate SEO fields
+        seoService.generateRestaurantSeo(restaurant);
+        
         return restaurantRepository.save(restaurant);
     }
 

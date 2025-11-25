@@ -27,6 +27,20 @@ public class Restaurant {
 
     private String name;
 
+    @Column(unique = true)
+    private String slug; // SEO-friendly URL: "nha-hang-pho-ha-noi"
+
+    @Column(length = 70)
+    private String metaTitle; // SEO title (max 70 chars for Google)
+
+    @Column(length = 160)
+    private String metaDescription; // SEO description (max 160 chars)
+
+    @Column(columnDefinition = "TEXT")
+    private String metaKeywords; // SEO keywords: "phở, bún bò, món Việt"
+
+    private String ogImage; // Open Graph image URL for social sharing
+
     @Column(columnDefinition = "TEXT")
     private String address;
 

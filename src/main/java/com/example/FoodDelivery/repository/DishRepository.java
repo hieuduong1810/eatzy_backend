@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import com.example.FoodDelivery.domain.Dish;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DishRepository extends JpaRepository<Dish, Long>, JpaSpecificationExecutor<Dish> {
@@ -15,4 +16,11 @@ public interface DishRepository extends JpaRepository<Dish, Long>, JpaSpecificat
     List<Dish> findByCategoryId(Long categoryId);
 
     boolean existsByNameAndRestaurantId(String name, Long restaurantId);
+    
+    // SEO methods
+    Optional<Dish> findBySlug(String slug);
+    
+    boolean existsBySlug(String slug);
+    
+    boolean existsBySlugAndIdNot(String slug, Long id);
 }
