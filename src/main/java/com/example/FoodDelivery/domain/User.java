@@ -74,11 +74,6 @@ public class User {
     @JsonIgnore
     private List<Restaurant> ownedRestaurants;
 
-    // Carts (One-to-Many)
-    @OneToMany(mappedBy = "customer")
-    @JsonIgnore
-    private List<Cart> carts;
-
     // Orders as customer (One-to-Many)
     @OneToMany(mappedBy = "customer")
     @JsonIgnore

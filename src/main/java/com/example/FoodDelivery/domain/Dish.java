@@ -37,8 +37,5 @@ public class Dish {
     private int availabilityQuantity;
 
     @OneToMany(mappedBy = "dish")
-    private List<CartItem> cartItems;
-
-    @OneToMany(mappedBy = "dish")
     private List<OrderItem> orderItems;
 }
