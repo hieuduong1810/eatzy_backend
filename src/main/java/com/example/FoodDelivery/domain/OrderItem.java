@@ -3,6 +3,7 @@ package com.example.FoodDelivery.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "order_items")
@@ -24,6 +25,9 @@ public class OrderItem {
     private Dish dish;
 
     private Integer quantity;
+
+    @OneToMany(mappedBy = "orderItem", cascade = CascadeType.ALL)
+    private List<OrderItemOption> orderItemOptions;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal priceAtPurchase;

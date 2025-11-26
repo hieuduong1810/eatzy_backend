@@ -7,6 +7,7 @@ import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Restaurant;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.service.RestaurantService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
@@ -33,19 +34,21 @@ public class RestaurantController {
 
     @PostMapping("/restaurants")
     @ApiMessage("Create restaurant")
-    public ResponseEntity<Restaurant> createRestaurant(@RequestBody Restaurant restaurant) throws IdInvalidException {
+    public ResponseEntity<ResRestaurantDTO> createRestaurant(@RequestBody Restaurant restaurant)
+            throws IdInvalidException {
         if (this.restaurantService.existsByName(restaurant.getName())) {
             throw new IdInvalidException("Restaurant name already exists: " + restaurant.getName());
         }
 
-        Restaurant createdRestaurant = restaurantService.createRestaurant(restaurant);
+        ResRestaurantDTO createdRestaurant = restaurantService.createRestaurantDTO(restaurant);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRestaurant);
     }
 
     @PutMapping("/restaurants")
     @ApiMessage("Update restaurant")
-    public ResponseEntity<Restaurant> updateRestaurant(@RequestBody Restaurant restaurant) throws IdInvalidException {
-        Restaurant updatedRestaurant = restaurantService.updateRestaurant(restaurant);
+    public ResponseEntity<ResRestaurantDTO> updateRestaurant(@RequestBody Restaurant restaurant)
+            throws IdInvalidException {
+        ResRestaurantDTO updatedRestaurant = restaurantService.updateRestaurantDTO(restaurant);
         return ResponseEntity.ok(updatedRestaurant);
     }
 
@@ -53,14 +56,14 @@ public class RestaurantController {
     @ApiMessage("Get all restaurants")
     public ResponseEntity<ResultPaginationDTO> getAllRestaurants(
             @Filter Specification<Restaurant> spec, Pageable pageable) {
-        ResultPaginationDTO result = restaurantService.getAllRestaurants(spec, pageable);
+        ResultPaginationDTO result = restaurantService.getAllRestaurantsDTO(spec, pageable);
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/restaurants/{id}")
     @ApiMessage("Get restaurant by id")
-    public ResponseEntity<Restaurant> getRestaurantById(@PathVariable("id") Long id) throws IdInvalidException {
-        Restaurant restaurant = restaurantService.getRestaurantById(id);
+    public ResponseEntity<ResRestaurantDTO> getRestaurantById(@PathVariable("id") Long id) throws IdInvalidException {
+        ResRestaurantDTO restaurant = restaurantService.getRestaurantDTOById(id);
         if (restaurant == null) {
             throw new IdInvalidException("Restaurant not found with id: " + id);
         }

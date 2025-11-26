@@ -8,6 +8,7 @@ import com.turkraft.springfilter.boot.Filter;
 import jakarta.validation.Valid;
 import com.example.FoodDelivery.domain.OrderItemOption;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.order.ResOrderItemOptionDTO;
 import com.example.FoodDelivery.service.OrderItemOptionService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
@@ -35,17 +36,18 @@ public class OrderItemOptionController {
 
     @PostMapping("/order-item-options")
     @ApiMessage("Create new order item option")
-    public ResponseEntity<OrderItemOption> createOrderItemOption(@Valid @RequestBody OrderItemOption orderItemOption)
+    public ResponseEntity<ResOrderItemOptionDTO> createOrderItemOption(
+            @Valid @RequestBody OrderItemOption orderItemOption)
             throws IdInvalidException {
-        OrderItemOption createdOrderItemOption = orderItemOptionService.createOrderItemOption(orderItemOption);
+        ResOrderItemOptionDTO createdOrderItemOption = orderItemOptionService.createOrderItemOptionDTO(orderItemOption);
         return ResponseEntity.ok(createdOrderItemOption);
     }
 
     @PutMapping("/order-item-options")
     @ApiMessage("Update order item option")
-    public ResponseEntity<OrderItemOption> updateOrderItemOption(@RequestBody OrderItemOption orderItemOption)
+    public ResponseEntity<ResOrderItemOptionDTO> updateOrderItemOption(@RequestBody OrderItemOption orderItemOption)
             throws IdInvalidException {
-        OrderItemOption updatedOrderItemOption = orderItemOptionService.updateOrderItemOption(orderItemOption);
+        ResOrderItemOptionDTO updatedOrderItemOption = orderItemOptionService.updateOrderItemOptionDTO(orderItemOption);
         return ResponseEntity.ok(updatedOrderItemOption);
     }
 
@@ -53,15 +55,15 @@ public class OrderItemOptionController {
     @ApiMessage("Get all order item options")
     public ResponseEntity<ResultPaginationDTO> getAllOrderItemOptions(
             @Filter Specification<OrderItemOption> spec, Pageable pageable) {
-        ResultPaginationDTO result = orderItemOptionService.getAllOrderItemOptions(spec, pageable);
+        ResultPaginationDTO result = orderItemOptionService.getAllOrderItemOptionsDTO(spec, pageable);
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/order-item-options/{id}")
     @ApiMessage("Get order item option by id")
-    public ResponseEntity<OrderItemOption> getOrderItemOptionById(@PathVariable("id") Long id)
+    public ResponseEntity<ResOrderItemOptionDTO> getOrderItemOptionById(@PathVariable("id") Long id)
             throws IdInvalidException {
-        OrderItemOption orderItemOption = orderItemOptionService.getOrderItemOptionById(id);
+        ResOrderItemOptionDTO orderItemOption = orderItemOptionService.getOrderItemOptionDTOById(id);
         if (orderItemOption == null) {
             throw new IdInvalidException("Order item option not found with id: " + id);
         }

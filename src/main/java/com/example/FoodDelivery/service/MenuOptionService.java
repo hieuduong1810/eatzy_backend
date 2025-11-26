@@ -32,17 +32,17 @@ public class MenuOptionService {
     }
 
     public List<MenuOption> getMenuOptionsByGroupId(Long groupId) {
-        return this.menuOptionRepository.findByMenuOptionGroupGroupId(groupId);
+        return this.menuOptionRepository.findByMenuOptionGroupId(groupId);
     }
 
     public MenuOption createMenuOption(MenuOption menuOption) throws IdInvalidException {
         // check menu option group exists
         if (menuOption.getMenuOptionGroup() != null) {
             MenuOptionGroup group = this.menuOptionGroupRepository
-                    .findById(menuOption.getMenuOptionGroup().getGroupId()).orElse(null);
+                    .findById(menuOption.getMenuOptionGroup().getId()).orElse(null);
             if (group == null) {
                 throw new IdInvalidException(
-                        "Menu option group not found with id: " + menuOption.getMenuOptionGroup().getGroupId());
+                        "Menu option group not found with id: " + menuOption.getMenuOptionGroup().getId());
             }
             menuOption.setMenuOptionGroup(group);
         } else {
@@ -54,9 +54,9 @@ public class MenuOptionService {
 
     public MenuOption updateMenuOption(MenuOption menuOption) throws IdInvalidException {
         // check id
-        MenuOption currentMenuOption = getMenuOptionById(menuOption.getOptionId());
+        MenuOption currentMenuOption = getMenuOptionById(menuOption.getId());
         if (currentMenuOption == null) {
-            throw new IdInvalidException("Menu option not found with id: " + menuOption.getOptionId());
+            throw new IdInvalidException("Menu option not found with id: " + menuOption.getId());
         }
 
         if (menuOption.getName() != null) {
@@ -70,10 +70,10 @@ public class MenuOptionService {
         }
         if (menuOption.getMenuOptionGroup() != null) {
             MenuOptionGroup group = this.menuOptionGroupRepository
-                    .findById(menuOption.getMenuOptionGroup().getGroupId()).orElse(null);
+                    .findById(menuOption.getMenuOptionGroup().getId()).orElse(null);
             if (group == null) {
                 throw new IdInvalidException(
-                        "Menu option group not found with id: " + menuOption.getMenuOptionGroup().getGroupId());
+                        "Menu option group not found with id: " + menuOption.getMenuOptionGroup().getId());
             }
             currentMenuOption.setMenuOptionGroup(group);
         }

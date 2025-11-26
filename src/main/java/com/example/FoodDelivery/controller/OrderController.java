@@ -6,10 +6,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Order;
+import com.example.FoodDelivery.domain.req.ReqOrderDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.order.ResOrderDTO;
 import com.example.FoodDelivery.service.OrderService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
+import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -38,15 +41,16 @@ public class OrderController {
 
     @PostMapping("/orders")
     @ApiMessage("Create order")
-    public ResponseEntity<Order> createOrder(@RequestBody Order order) throws IdInvalidException {
-        Order createdOrder = orderService.createOrder(order);
+    public ResponseEntity<ResOrderDTO> createOrder(@Valid @RequestBody ReqOrderDTO reqOrderDTO)
+            throws IdInvalidException {
+        ResOrderDTO createdOrder = orderService.createOrderFromReqDTO(reqOrderDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
     }
 
     @PutMapping("/orders")
     @ApiMessage("Update order")
-    public ResponseEntity<Order> updateOrder(@RequestBody Order order) throws IdInvalidException {
-        Order updatedOrder = orderService.updateOrder(order);
+    public ResponseEntity<ResOrderDTO> updateOrder(@RequestBody Order order) throws IdInvalidException {
+        ResOrderDTO updatedOrder = orderService.updateOrderDTO(order);
         return ResponseEntity.ok(updatedOrder);
     }
 
@@ -54,14 +58,14 @@ public class OrderController {
     @ApiMessage("Get all orders")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(
             @Filter Specification<Order> spec, Pageable pageable) {
-        ResultPaginationDTO result = orderService.getAllOrders(spec, pageable);
+        ResultPaginationDTO result = orderService.getAllOrdersDTO(spec, pageable);
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/orders/{id}")
     @ApiMessage("Get order by id")
-    public ResponseEntity<Order> getOrderById(@PathVariable("id") Long id) throws IdInvalidException {
-        Order order = orderService.getOrderById(id);
+    public ResponseEntity<ResOrderDTO> getOrderById(@PathVariable("id") Long id) throws IdInvalidException {
+        ResOrderDTO order = orderService.getOrderDTOById(id);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + id);
         }

@@ -13,8 +13,12 @@ import com.example.FoodDelivery.domain.Dish;
 import com.example.FoodDelivery.domain.Order;
 import com.example.FoodDelivery.domain.OrderItem;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.order.ResOrderItemDTO;
+import com.example.FoodDelivery.domain.res.order.ResOrderItemOptionDTO;
 import com.example.FoodDelivery.repository.OrderItemRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
+
+import java.util.stream.Collectors;
 
 @Service
 public class OrderItemService {
@@ -29,9 +33,57 @@ public class OrderItemService {
         this.dishService = dishService;
     }
 
+    private ResOrderItemDTO convertToResOrderItemDTO(OrderItem orderItem) {
+        ResOrderItemDTO dto = new ResOrderItemDTO();
+        dto.setId(orderItem.getId());
+        dto.setQuantity(orderItem.getQuantity());
+        dto.setPriceAtPurchase(orderItem.getPriceAtPurchase());
+
+        // Convert dish
+        if (orderItem.getDish() != null) {
+            ResOrderItemDTO.Dish dish = new ResOrderItemDTO.Dish();
+            dish.setId(orderItem.getDish().getId());
+            dish.setName(orderItem.getDish().getName());
+            dish.setPrice(orderItem.getDish().getPrice());
+            dto.setDish(dish);
+        }
+
+        // Convert order item options list
+        if (orderItem.getOrderItemOptions() != null && !orderItem.getOrderItemOptions().isEmpty()) {
+            List<ResOrderItemOptionDTO> optionDtos = orderItem.getOrderItemOptions().stream()
+                    .map(option -> {
+                        ResOrderItemOptionDTO optionDto = new ResOrderItemOptionDTO();
+                        optionDto.setId(option.getId());
+
+                        // Convert menu option
+                        if (option.getMenuOption() != null) {
+                            ResOrderItemOptionDTO.MenuOption menuOption = new ResOrderItemOptionDTO.MenuOption();
+                            menuOption.setId(option.getMenuOption().getId());
+                            menuOption.setName(option.getMenuOption().getName());
+                            menuOption.setPriceAdjustment(option.getMenuOption().getPriceAdjustment());
+                            optionDto.setMenuOption(menuOption);
+                        }
+
+                        return optionDto;
+                    })
+                    .collect(Collectors.toList());
+            dto.setOrderItemOptions(optionDtos);
+        }
+
+        return dto;
+    }
+
     public OrderItem getOrderItemById(Long id) {
         Optional<OrderItem> orderItemOpt = this.orderItemRepository.findById(id);
         return orderItemOpt.orElse(null);
+    }
+
+    public ResOrderItemDTO getOrderItemDTOById(Long id) {
+        OrderItem orderItem = getOrderItemById(id);
+        if (orderItem == null) {
+            return null;
+        }
+        return convertToResOrderItemDTO(orderItem);
     }
 
     public List<OrderItem> getOrderItemsByOrderId(Long orderId) {
@@ -79,6 +131,11 @@ public class OrderItemService {
         return orderItemRepository.save(orderItem);
     }
 
+    public ResOrderItemDTO createOrderItemDTO(OrderItem orderItem) throws IdInvalidException {
+        OrderItem savedOrderItem = createOrderItem(orderItem);
+        return convertToResOrderItemDTO(savedOrderItem);
+    }
+
     @Transactional
     public OrderItem updateOrderItem(OrderItem orderItem) throws IdInvalidException {
         // check id
@@ -103,6 +160,11 @@ public class OrderItemService {
         return orderItemRepository.save(currentOrderItem);
     }
 
+    public ResOrderItemDTO updateOrderItemDTO(OrderItem orderItem) throws IdInvalidException {
+        OrderItem updatedOrderItem = updateOrderItem(orderItem);
+        return convertToResOrderItemDTO(updatedOrderItem);
+    }
+
     public ResultPaginationDTO getAllOrderItems(Specification<OrderItem> spec, Pageable pageable) {
         Page<OrderItem> page = this.orderItemRepository.findAll(spec, pageable);
         ResultPaginationDTO result = new ResultPaginationDTO();
@@ -113,6 +175,21 @@ public class OrderItemService {
         meta.setPages(page.getTotalPages());
         result.setMeta(meta);
         result.setResult(page.getContent());
+        return result;
+    }
+
+    public ResultPaginationDTO getAllOrderItemsDTO(Specification<OrderItem> spec, Pageable pageable) {
+        Page<OrderItem> page = this.orderItemRepository.findAll(spec, pageable);
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(page.getTotalElements());
+        meta.setPages(page.getTotalPages());
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(this::convertToResOrderItemDTO)
+                .collect(Collectors.toList()));
         return result;
     }
 

@@ -3,6 +3,7 @@ package com.example.FoodDelivery.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "menu_options")
@@ -14,8 +15,7 @@ import java.math.BigDecimal;
 public class MenuOption {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "option_id")
-    private Long optionId;
+    private Long id;
 
     @ManyToOne
     @JoinColumn(name = "group_id")
@@ -28,4 +28,7 @@ public class MenuOption {
 
     @Column(name = "is_available")
     private Boolean isAvailable;
+
+    @OneToMany(mappedBy = "menuOption")
+    private List<OrderItemOption> orderItemOptions;
 }

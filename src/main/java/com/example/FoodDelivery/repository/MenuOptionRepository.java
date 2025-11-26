@@ -10,5 +10,5 @@ import java.util.List;
 
 @Repository
 public interface MenuOptionRepository extends JpaRepository<MenuOption, Long>, JpaSpecificationExecutor<MenuOption> {
-    List<MenuOption> findByMenuOptionGroupGroupId(Long groupId);
+    List<MenuOption> findByMenuOptionGroupId(Long groupId);
 }

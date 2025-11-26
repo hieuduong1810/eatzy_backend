@@ -51,9 +51,9 @@ public class MenuOptionGroupService {
 
     public MenuOptionGroup updateMenuOptionGroup(MenuOptionGroup menuOptionGroup) throws IdInvalidException {
         // check id
-        MenuOptionGroup currentMenuOptionGroup = getMenuOptionGroupById(menuOptionGroup.getGroupId());
+        MenuOptionGroup currentMenuOptionGroup = getMenuOptionGroupById(menuOptionGroup.getId());
         if (currentMenuOptionGroup == null) {
-            throw new IdInvalidException("Menu option group not found with id: " + menuOptionGroup.getGroupId());
+            throw new IdInvalidException("Menu option group not found with id: " + menuOptionGroup.getId());
         }
 
         if (menuOptionGroup.getGroupName() != null) {

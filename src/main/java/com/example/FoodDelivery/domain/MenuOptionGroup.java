@@ -15,8 +15,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 public class MenuOptionGroup {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "group_id")
-    private Long groupId;
+    private Long id;
 
     @ManyToOne
     @JoinColumn(name = "dish_id")
