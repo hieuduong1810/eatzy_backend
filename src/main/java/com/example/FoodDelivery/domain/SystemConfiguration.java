@@ -2,6 +2,8 @@ package com.example.FoodDelivery.domain;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,6 +29,7 @@ public class SystemConfiguration {
 
     @ManyToOne
     @JoinColumn(name = "last_updated_by")
+    @JsonIgnore
     private User lastUpdatedBy;
 
     private Instant updatedAt;

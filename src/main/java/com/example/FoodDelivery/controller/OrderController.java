@@ -102,27 +102,27 @@ public class OrderController {
 
     @PatchMapping("/orders/{id}/assign-driver")
     @ApiMessage("Assign driver to order")
-    public ResponseEntity<Order> assignDriver(
+    public ResponseEntity<ResOrderDTO> assignDriver(
             @PathVariable("id") Long orderId,
             @RequestBody Map<String, Long> body) throws IdInvalidException {
         Long driverId = body.get("driverId");
         if (driverId == null) {
             throw new IdInvalidException("Driver id is required");
         }
-        Order order = orderService.assignDriver(orderId, driverId);
+        ResOrderDTO order = orderService.assignDriver(orderId, driverId);
         return ResponseEntity.ok(order);
     }
 
     @PatchMapping("/orders/{id}/status")
     @ApiMessage("Update order status")
-    public ResponseEntity<Order> updateOrderStatus(
+    public ResponseEntity<ResOrderDTO> updateOrderStatus(
             @PathVariable("id") Long orderId,
             @RequestBody Map<String, String> body) throws IdInvalidException {
         String status = body.get("status");
         if (status == null) {
             throw new IdInvalidException("Status is required");
         }
-        Order order = orderService.updateOrderStatus(orderId, status);
+        ResOrderDTO order = orderService.updateOrderStatus(orderId, status);
         return ResponseEntity.ok(order);
     }
 

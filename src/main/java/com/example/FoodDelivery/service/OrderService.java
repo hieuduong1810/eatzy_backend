@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,6 +33,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
+
+    private final OrderEarningsSummaryService orderEarningsSummaryService;
+
     private final OrderRepository orderRepository;
     private final UserService userService;
     private final RestaurantService restaurantService;
@@ -40,12 +44,13 @@ public class OrderService {
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, DishService dishService,
-            MenuOptionRepository menuOptionRepository) {
+            MenuOptionRepository menuOptionRepository, @Lazy OrderEarningsSummaryService orderEarningsSummaryService) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
         this.dishService = dishService;
         this.menuOptionRepository = menuOptionRepository;
+        this.orderEarningsSummaryService = orderEarningsSummaryService;
     }
 
     private ResOrderDTO convertToResOrderDTO(Order order) {
@@ -423,7 +428,7 @@ public class OrderService {
     }
 
     @Transactional
-    public Order assignDriver(Long orderId, Long driverId) throws IdInvalidException {
+    public ResOrderDTO assignDriver(Long orderId, Long driverId) throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + orderId);
@@ -436,11 +441,13 @@ public class OrderService {
 
         order.setDriver(driver);
         order.setOrderStatus("ASSIGNED");
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+
+        return convertToResOrderDTO(order);
     }
 
     @Transactional
-    public Order updateOrderStatus(Long orderId, String status) throws IdInvalidException {
+    public ResOrderDTO updateOrderStatus(Long orderId, String status) throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + orderId);
@@ -452,8 +459,10 @@ public class OrderService {
         if ("DELIVERED".equals(status) && order.getDeliveredAt() == null) {
             order.setDeliveredAt(Instant.now());
         }
+        orderEarningsSummaryService.createOrderEarningsSummaryFromOrder(orderId);
+        order = orderRepository.save(order);
 
-        return orderRepository.save(order);
+        return convertToResOrderDTO(order);
     }
 
     @Transactional

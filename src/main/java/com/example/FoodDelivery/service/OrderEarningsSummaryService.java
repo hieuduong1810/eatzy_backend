@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.FoodDelivery.domain.Order;
 import com.example.FoodDelivery.domain.OrderEarningsSummary;
 import com.example.FoodDelivery.domain.Restaurant;
+import com.example.FoodDelivery.domain.SystemConfiguration;
 import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.repository.OrderEarningsSummaryRepository;
@@ -26,15 +27,18 @@ public class OrderEarningsSummaryService {
     private final OrderService orderService;
     private final UserService userService;
     private final RestaurantService restaurantService;
+    private final SystemConfigurationService systemConfigurationService;
 
     public OrderEarningsSummaryService(OrderEarningsSummaryRepository orderEarningsSummaryRepository,
             OrderService orderService,
             UserService userService,
-            RestaurantService restaurantService) {
+            RestaurantService restaurantService,
+            SystemConfigurationService systemConfigurationService) {
         this.orderEarningsSummaryRepository = orderEarningsSummaryRepository;
         this.orderService = orderService;
         this.userService = userService;
         this.restaurantService = restaurantService;
+        this.systemConfigurationService = systemConfigurationService;
     }
 
     public OrderEarningsSummary getOrderEarningsSummaryById(Long id) {
@@ -132,14 +136,28 @@ public class OrderEarningsSummaryService {
             throw new IdInvalidException("Earnings summary already exists for order id: " + orderId);
         }
 
-        // get restaurant commission rate
+        // get restaurant commission rate from restaurant or system config
         BigDecimal restaurantCommissionRate = order.getRestaurant().getCommissionRate();
         if (restaurantCommissionRate == null) {
-            restaurantCommissionRate = new BigDecimal("15.00"); // default 15%
+            // get from system configuration
+            SystemConfiguration restaurantConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("RESTAURANT_COMMISSION_RATE");
+            if (restaurantConfig != null && restaurantConfig.getConfigValue() != null) {
+                restaurantCommissionRate = new BigDecimal(restaurantConfig.getConfigValue());
+            } else {
+                restaurantCommissionRate = new BigDecimal("15.00"); // default 15%
+            }
         }
 
-        // default driver commission rate (e.g., 80% of delivery fee goes to driver)
-        BigDecimal driverCommissionRate = new BigDecimal("80.00");
+        // get driver commission rate from system configuration
+        BigDecimal driverCommissionRate;
+        SystemConfiguration driverConfig = systemConfigurationService
+                .getSystemConfigurationByKey("DRIVER_COMMISSION_RATE");
+        if (driverConfig != null && driverConfig.getConfigValue() != null) {
+            driverCommissionRate = new BigDecimal(driverConfig.getConfigValue());
+        } else {
+            driverCommissionRate = new BigDecimal("80.00"); // default 80%
+        }
 
         // calculate earnings
         BigDecimal orderSubtotal = order.getSubtotal();
@@ -155,11 +173,11 @@ public class OrderEarningsSummaryService {
         BigDecimal driverCommissionAmount = deliveryFee
                 .multiply(driverCommissionRate)
                 .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-        BigDecimal driverNetEarning = driverCommissionAmount;
+        BigDecimal driverNetEarning = deliveryFee.subtract(driverCommissionAmount);
 
         // platform earnings
         BigDecimal platformTotalEarning = restaurantCommissionAmount
-                .add(deliveryFee.subtract(driverCommissionAmount));
+                .add(driverCommissionAmount);
 
         OrderEarningsSummary summary = OrderEarningsSummary.builder()
                 .order(order)
