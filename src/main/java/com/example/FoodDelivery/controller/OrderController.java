@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +45,17 @@ public class OrderController {
             @Valid @RequestBody ReqOrderDTO reqOrderDTO,
             HttpServletRequest request) throws IdInvalidException {
         String clientIp = getClientIp(request);
-        ResOrderDTO createdOrder = orderService.createOrderFromReqDTO(reqOrderDTO, clientIp);
+
+        // Get base URL from request
+        String scheme = request.getScheme();
+        String serverName = request.getServerName();
+        int serverPort = request.getServerPort();
+        String baseUrl = scheme + "://" + serverName;
+        if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
+            baseUrl += ":" + serverPort;
+        }
+
+        ResOrderDTO createdOrder = orderService.createOrderFromReqDTO(reqOrderDTO, clientIp, baseUrl);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
     }
 

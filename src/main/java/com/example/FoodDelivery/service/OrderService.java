@@ -227,7 +227,8 @@ public class OrderService {
     }
 
     @Transactional
-    public ResOrderDTO createOrderFromReqDTO(ReqOrderDTO reqOrderDTO, String clientIp) throws IdInvalidException {
+    public ResOrderDTO createOrderFromReqDTO(ReqOrderDTO reqOrderDTO, String clientIp, String baseUrl)
+            throws IdInvalidException {
         // Create Order entity
         Order order = new Order();
 
@@ -376,10 +377,10 @@ public class OrderService {
         } else if ("VNPAY".equals(savedOrder.getPaymentMethod())) {
             // Generate VNPAY payment URL
             try {
-                String paymentUrl = vnPayService.createPaymentUrl(savedOrder, clientIp);
+                String paymentUrl = vnPayService.createPaymentUrl(savedOrder, clientIp, baseUrl);
                 orderDTO.setVnpayPaymentUrl(paymentUrl);
-                log.info("VNPAY payment URL generated for order {} with client IP {}: {}",
-                        savedOrder.getId(), clientIp, paymentUrl);
+                log.info("VNPAY payment URL generated for order {} with client IP {} and base URL {}: {}",
+                        savedOrder.getId(), clientIp, baseUrl, paymentUrl);
             } catch (Exception e) {
                 log.error("Failed to generate VNPAY payment URL: {}", e.getMessage());
                 throw new IdInvalidException("Failed to generate payment URL: " + e.getMessage());
