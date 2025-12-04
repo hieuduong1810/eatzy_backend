@@ -4,7 +4,6 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.util.Map;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -82,7 +81,16 @@ public class PaymentController {
             ipAddress = request.getRemoteAddr();
         }
 
-        String paymentUrl = vnPayService.createPaymentUrl(order, ipAddress);
+        // Get base URL from request
+        String scheme = request.getScheme();
+        String serverName = request.getServerName();
+        int serverPort = request.getServerPort();
+        String baseUrl = scheme + "://" + serverName;
+        if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
+            baseUrl += ":" + serverPort;
+        }
+
+        String paymentUrl = vnPayService.createPaymentUrl(order, ipAddress, baseUrl);
 
         Map<String, Object> result = Map.of(
                 "success", true,

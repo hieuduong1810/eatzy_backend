@@ -41,9 +41,6 @@ public class VNPayService {
     @Value("${vnpay.url:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
     private String vnp_Url;
 
-    @Value("${vnpay.return_url:http://localhost:8080/api/v1/payment/vnpay/callback}")
-    private String vnp_ReturnUrl;
-
     public VNPayService(
             WalletService walletService,
             WalletTransactionService walletTransactionService,
@@ -60,9 +57,11 @@ public class VNPayService {
      * 
      * @param order     Order to create payment for
      * @param ipAddress Client IP address
+     * @param baseUrl   Base URL for callback (e.g., http://localhost:8080 or
+     *                  http://server-ip:port)
      * @return Payment URL
      */
-    public String createPaymentUrl(Order order, String ipAddress) throws UnsupportedEncodingException {
+    public String createPaymentUrl(Order order, String ipAddress, String baseUrl) throws UnsupportedEncodingException {
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", "2.1.0");
         vnp_Params.put("vnp_Command", "pay");
@@ -77,7 +76,11 @@ public class VNPayService {
         vnp_Params.put("vnp_OrderInfo", "Payment for order #" + order.getId());
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);
+
+        // Generate dynamic callback URL based on request
+        String callbackUrl = baseUrl + "/api/v1/payment/vnpay/callback";
+        vnp_Params.put("vnp_ReturnUrl", callbackUrl);
+
         vnp_Params.put("vnp_IpAddr", ipAddress);
 
         Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
