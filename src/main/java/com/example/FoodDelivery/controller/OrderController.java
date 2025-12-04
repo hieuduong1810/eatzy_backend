@@ -61,24 +61,25 @@ public class OrderController {
         String forwardedHost = request.getHeader("X-Forwarded-Host");
 
         if (forwardedProto != null && forwardedHost != null) {
-            // Production: nginx reverse proxy với domain
+            // Production: nginx reverse proxy with domain and SSL
             return forwardedProto + "://" + forwardedHost;
         }
 
-        // Priority 2: Use Host header
+        // Priority 2: Use Host header with X-Forwarded-Proto if available
         String hostHeader = request.getHeader("Host");
         if (hostHeader != null) {
-            String scheme = request.getScheme();
-            // Localhost hoặc direct IP access
+            // If X-Forwarded-Proto exists, use it (HTTPS from nginx)
+            String scheme = forwardedProto != null ? forwardedProto : request.getScheme();
             return scheme + "://" + hostHeader;
         }
 
         // Priority 3: Fallback - construct from request
-        String scheme = request.getScheme();
+        String scheme = forwardedProto != null ? forwardedProto : request.getScheme();
         String serverName = request.getServerName();
         int serverPort = request.getServerPort();
 
         String baseUrl = scheme + "://" + serverName;
+        // Only add port if non-standard
         if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
             baseUrl += ":" + serverPort;
         }
