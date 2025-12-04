@@ -46,17 +46,52 @@ public class OrderController {
             HttpServletRequest request) throws IdInvalidException {
         String clientIp = getClientIp(request);
 
-        // Get base URL from request
+        // Get base URL from request with proper validation
+        String baseUrl = getBaseUrl(request);
+
+        ResOrderDTO createdOrder = orderService.createOrderFromReqDTO(reqOrderDTO, clientIp, baseUrl);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
+    }
+
+    /**
+     * Extract base URL from request, handling reverse proxy scenarios
+     */
+    private String getBaseUrl(HttpServletRequest request) {
+        // Priority 1: Check X-Forwarded-Proto and X-Forwarded-Host from reverse proxy
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        String forwardedHost = request.getHeader("X-Forwarded-Host");
+
+        if (forwardedProto != null && forwardedHost != null && !forwardedHost.isEmpty()) {
+            // Validate and sanitize forwarded host (remove invalid characters)
+            String sanitizedHost = forwardedHost.replaceAll("[^a-zA-Z0-9._-]", "");
+            return forwardedProto + "://" + sanitizedHost;
+        }
+
+        // Priority 2: Use Host header
+        String hostHeader = request.getHeader("Host");
+        if (hostHeader != null && !hostHeader.isEmpty()) {
+            String scheme = request.getScheme();
+            String sanitizedHost = hostHeader.replaceAll("[^a-zA-Z0-9.:_-]", "");
+            return scheme + "://" + sanitizedHost;
+        }
+
+        // Priority 3: Fallback to request properties
         String scheme = request.getScheme();
         String serverName = request.getServerName();
         int serverPort = request.getServerPort();
+
+        // Validate server name (must not contain invalid characters)
+        if (serverName == null || serverName.contains("=") || !serverName.matches("[a-zA-Z0-9._-]+")) {
+            // Fallback to IP if domain is invalid
+            serverName = "113.177.135.214";
+        }
+
         String baseUrl = scheme + "://" + serverName;
         if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
             baseUrl += ":" + serverPort;
         }
 
-        ResOrderDTO createdOrder = orderService.createOrderFromReqDTO(reqOrderDTO, clientIp, baseUrl);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
+        return baseUrl;
     }
 
     /**
