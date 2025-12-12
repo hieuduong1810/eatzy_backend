@@ -103,6 +103,7 @@ public class OrderService {
         dto.setPaymentStatus(order.getPaymentStatus());
         dto.setCancellationReason(order.getCancellationReason());
         dto.setCreatedAt(order.getCreatedAt());
+        dto.setPreparingAt(order.getPreparingAt());
         dto.setDeliveredAt(order.getDeliveredAt());
 
         // Convert customer
@@ -646,7 +647,6 @@ public class OrderService {
         }
 
         order.setDriver(driver);
-        order.setOrderStatus("DRIVER_ASSIGNED");
         order = orderRepository.save(order);
 
         // Convert to DTO for response
@@ -660,26 +660,38 @@ public class OrderService {
 
     // CUSTOMER ACTIONS
     @Transactional
-    public Order cancelOrder(Long orderId, String cancellationReason) throws IdInvalidException {
+    public ResOrderDTO cancelOrder(Long orderId, String cancellationReason) throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + orderId);
         }
 
-        if ("DELIVERED".equals(order.getOrderStatus()) || "CANCELLED".equals(order.getOrderStatus())) {
-            throw new IdInvalidException("Cannot cancel order with status: " + order.getOrderStatus());
+        if (!"PENDING".equals(order.getOrderStatus())) {
+            throw new IdInvalidException(
+                    "Can only reject orders with PENDING status. Current status: " + order.getOrderStatus());
         }
 
-        order.setOrderStatus("CANCELLED");
+        order.setOrderStatus("REJECTED");
         order.setCancellationReason(cancellationReason);
+
+        // If payment was already made (WALLET or VNPAY), process refund
+        if ("PAID".equals(order.getPaymentStatus()) &&
+                ("WALLET".equals(order.getPaymentMethod()) || "VNPAY".equals(order.getPaymentMethod()))) {
+            paymentService.processRefund(order);
+            order.setPaymentStatus("REFUNDED");
+        }
+
         order = orderRepository.save(order);
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify restaurant and driver about cancellation
+        // Notify customer about order rejection
+        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+                orderDTO, "Your order has been rejected by the restaurant");
+
         webSocketService.broadcastOrderStatusChange(orderDTO);
 
-        return order;
+        return orderDTO;
     }
 
     // RESTAURANT ACTIONS
@@ -725,6 +737,7 @@ public class OrderService {
         }
 
         order.setOrderStatus("PREPARING");
+        order.setPreparingAt(Instant.now());
         order = orderRepository.save(order);
 
         // Notify customer about order acceptance
@@ -734,39 +747,6 @@ public class OrderService {
         assignDriver(orderId);
 
         return convertToResOrderDTO(order);
-    }
-
-    @Transactional
-    public ResOrderDTO rejectOrder(Long orderId, String rejectionReason) throws IdInvalidException {
-        Order order = getOrderById(orderId);
-        if (order == null) {
-            throw new IdInvalidException("Order not found with id: " + orderId);
-        }
-
-        if (!"PENDING".equals(order.getOrderStatus())) {
-            throw new IdInvalidException(
-                    "Can only reject orders with PENDING status. Current status: " + order.getOrderStatus());
-        }
-
-        order.setOrderStatus("REJECTED");
-        order.setCancellationReason(rejectionReason);
-
-        // If payment was already made (WALLET or VNPAY), process refund
-        if ("PAID".equals(order.getPaymentStatus()) &&
-                ("WALLET".equals(order.getPaymentMethod()) || "VNPAY".equals(order.getPaymentMethod()))) {
-            // TODO: Process refund to customer wallet
-            order.setPaymentStatus("REFUNDED");
-        }
-
-        order = orderRepository.save(order);
-
-        ResOrderDTO orderDTO = convertToResOrderDTO(order);
-
-        // Notify customer about order rejection
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
-                orderDTO, "Your order has been rejected by the restaurant");
-
-        return orderDTO;
     }
 
     // DRIVER ACTIONS
@@ -912,23 +892,17 @@ public class OrderService {
         if (!candidateDrivers.isEmpty()) {
             DriverProfile closestDriver = findClosestDriverWithMapbox(candidateDrivers, restaurant);
             if (closestDriver != null) {
-                // Assign to next driver
+                // Assign to next driver and keep current status
                 order.setDriver(closestDriver.getUser());
-                // Keep status as READY or current status for next driver to accept
-                if ("DRIVER_ASSIGNED".equals(order.getOrderStatus())) {
-                    order.setOrderStatus("PREPARING");
-                }
             } else {
                 // Failed to calculate distance for all candidates
                 order.setDriver(null);
-                order.setOrderStatus("PREPARING");
                 log.warn("Failed to find closest driver for order {} - Mapbox distance calculation failed",
                         orderId);
             }
         } else {
-            // No more available drivers, set driver to null
+            // No more available drivers, set driver to null and reset status
             order.setDriver(null);
-            order.setOrderStatus("PREPARING");
         }
 
         order = orderRepository.save(order);

@@ -116,6 +116,84 @@ public class PaymentService {
     }
 
     /**
+     * Process refund payment
+     * Deduct from admin wallet and add to customer wallet
+     * 
+     * @param order
+     * @return refund result
+     * @throws IdInvalidException
+     */
+    @Transactional
+    public Map<String, Object> processRefund(Order order) throws IdInvalidException {
+        Map<String, Object> result = new HashMap<>();
+
+        if (order.getCustomer() == null) {
+            throw new IdInvalidException("Customer is required for refund");
+        }
+
+        BigDecimal refundAmount = order.getTotalAmount();
+
+        // Get admin wallet
+        User admin = getAdminUser();
+        if (admin == null) {
+            throw new IdInvalidException("Admin user not found");
+        }
+
+        Wallet adminWallet = walletService.getWalletByUserId(admin.getId());
+        if (adminWallet == null) {
+            throw new IdInvalidException("Admin wallet not found");
+        }
+
+        // Check sufficient balance in admin wallet
+        if (adminWallet.getBalance().compareTo(refundAmount) < 0) {
+            result.put("success", false);
+            result.put("message", "Insufficient admin wallet balance for refund");
+            result.put("currentBalance", adminWallet.getBalance());
+            result.put("requiredAmount", refundAmount);
+            return result;
+        }
+
+        // Get customer wallet
+        Wallet customerWallet = walletService.getWalletByUserId(order.getCustomer().getId());
+        if (customerWallet == null) {
+            throw new IdInvalidException("Customer wallet not found");
+        }
+
+        // Deduct from admin wallet
+        WalletTransaction adminTransaction = WalletTransaction.builder()
+                .wallet(adminWallet)
+                .transactionType("REFUND")
+                .amount(refundAmount.negate()) // negative for deduction
+                .balanceAfter(adminWallet.getBalance().add(refundAmount.negate()))
+                .description("Refund for order #" + order.getId())
+                .relatedOrderId(order.getId())
+                .status("SUCCESS")
+                .transactionDate(Instant.now())
+                .build();
+        walletTransactionService.createWalletTransaction(adminTransaction);
+
+        // Add to customer wallet
+        WalletTransaction customerTransaction = WalletTransaction.builder()
+                .wallet(customerWallet)
+                .transactionType("REFUND")
+                .amount(refundAmount)
+                .balanceAfter(customerWallet.getBalance().add(refundAmount))
+                .description("Refund for order #" + order.getId())
+                .relatedOrderId(order.getId())
+                .status("SUCCESS")
+                .transactionDate(Instant.now())
+                .build();
+        walletTransactionService.createWalletTransaction(customerTransaction);
+
+        result.put("success", true);
+        result.put("message", "Refund successful");
+        result.put("refundAmount", refundAmount);
+        result.put("newBalance", customerWallet.getBalance());
+
+        return result;
+    }
+
+    /**
      * Validate COD payment
      * Check if order amount is within driver's COD limit
      * 

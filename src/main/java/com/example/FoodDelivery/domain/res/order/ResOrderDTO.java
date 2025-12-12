@@ -30,6 +30,7 @@ public class ResOrderDTO {
     private String paymentStatus;
     private String cancellationReason;
     private Instant createdAt;
+    private Instant preparingAt;
     private Instant deliveredAt;
     private List<ResOrderItemDTO> orderItems;
     private String vnpayPaymentUrl; // VNPAY payment URL if payment method is VNPAY

@@ -33,4 +33,8 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     List<Order> findByPaymentMethodAndPaymentStatusAndCreatedAtBefore(String paymentMethod, String paymentStatus,
             Instant createdAt);
+
+    List<Order> findByOrderStatusAndCreatedAtBefore(String orderStatus, Instant createdAt);
+
+    List<Order> findByOrderStatusAndPreparingAtBefore(String orderStatus, Instant preparingAt);
 }

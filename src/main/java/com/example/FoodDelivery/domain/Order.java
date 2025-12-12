@@ -60,6 +60,7 @@ public class Order {
     private String cancellationReason;
 
     private Instant createdAt;
+    private Instant preparingAt;
     private Instant deliveredAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
