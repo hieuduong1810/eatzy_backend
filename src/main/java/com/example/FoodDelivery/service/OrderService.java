@@ -179,6 +179,78 @@ public class OrderService {
     }
 
     /**
+     * Helper method to calculate delivery fee based on real driving distance
+     */
+    private BigDecimal calculateDeliveryFee(Restaurant restaurant, BigDecimal deliveryLatitude,
+            BigDecimal deliveryLongitude) throws IdInvalidException {
+        if (restaurant == null || restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
+            throw new IdInvalidException("Restaurant location is required to calculate delivery fee");
+        }
+
+        if (deliveryLatitude == null || deliveryLongitude == null) {
+            throw new IdInvalidException("Delivery location is required to calculate delivery fee");
+        }
+
+        // Get configuration values
+        BigDecimal baseFee = new BigDecimal("15000"); // Default 15,000 VND
+        BigDecimal baseDistance = new BigDecimal("3"); // Default 3 km
+        BigDecimal perKmFee = new BigDecimal("5000"); // Default 5,000 VND per km
+
+        try {
+            SystemConfiguration baseFeeConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_BASE_FEE");
+            if (baseFeeConfig != null && baseFeeConfig.getConfigValue() != null
+                    && !baseFeeConfig.getConfigValue().isEmpty()) {
+                baseFee = new BigDecimal(baseFeeConfig.getConfigValue());
+            }
+
+            SystemConfiguration baseDistanceConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_BASE_DISTANCE");
+            if (baseDistanceConfig != null && baseDistanceConfig.getConfigValue() != null
+                    && !baseDistanceConfig.getConfigValue().isEmpty()) {
+                baseDistance = new BigDecimal(baseDistanceConfig.getConfigValue());
+            }
+
+            SystemConfiguration perKmFeeConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_PER_KM_FEE");
+            if (perKmFeeConfig != null && perKmFeeConfig.getConfigValue() != null
+                    && !perKmFeeConfig.getConfigValue().isEmpty()) {
+                perKmFee = new BigDecimal(perKmFeeConfig.getConfigValue());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get delivery fee configuration, using defaults", e);
+        }
+
+        // Get real driving distance using Mapbox API
+        BigDecimal distance = mapboxService.getDrivingDistance(
+                restaurant.getLongitude(),
+                restaurant.getLatitude(),
+                deliveryLongitude,
+                deliveryLatitude);
+
+        if (distance == null) {
+            log.warn("Failed to get driving distance from Mapbox, using base fee");
+            return baseFee;
+        }
+
+        log.info("Delivery distance: {} km, Base distance: {} km, Base fee: {} VND, Per km fee: {} VND",
+                distance, baseDistance, baseFee, perKmFee);
+
+        // Calculate fee: if distance <= baseDistance, return baseFee
+        // Otherwise: baseFee + (distance - baseDistance) * perKmFee
+        if (distance.compareTo(baseDistance) <= 0) {
+            return baseFee;
+        } else {
+            BigDecimal extraDistance = distance.subtract(baseDistance);
+            BigDecimal extraFee = extraDistance.multiply(perKmFee);
+            BigDecimal totalFee = baseFee.add(extraFee);
+            log.info("Calculated delivery fee: {} VND (base: {} + extra: {} for {} km)",
+                    totalFee, baseFee, extraFee, extraDistance);
+            return totalFee;
+        }
+    }
+
+    /**
      * Helper method to find the closest available driver using Mapbox API for real
      * driving distance
      */
@@ -325,8 +397,7 @@ public class OrderService {
                 : null);
         order.setSpecialInstructions(reqOrderDTO.getSpecialInstructions());
         order.setSubtotal(reqOrderDTO.getSubtotal());
-        order.setDeliveryFee(reqOrderDTO.getDeliveryFee());
-        order.setTotalAmount(reqOrderDTO.getTotalAmount());
+        // Delivery fee will be calculated based on distance and system configuration
         order.setPaymentMethod(reqOrderDTO.getPaymentMethod());
         order.setPaymentStatus(reqOrderDTO.getPaymentStatus() != null ? reqOrderDTO.getPaymentStatus() : "UNPAID");
         order.setCreatedAt(Instant.now());
@@ -406,9 +477,13 @@ public class OrderService {
             savedOrder.setOrderItems(orderItems);
         }
 
-        // Calculate total amount: subtotal + delivery fee
+        // Calculate delivery fee based on real driving distance
         savedOrder.setSubtotal(subtotal);
-        BigDecimal deliveryFee = savedOrder.getDeliveryFee() != null ? savedOrder.getDeliveryFee() : BigDecimal.ZERO;
+        BigDecimal deliveryFee = calculateDeliveryFee(
+                restaurant,
+                savedOrder.getDeliveryLatitude(),
+                savedOrder.getDeliveryLongitude());
+        savedOrder.setDeliveryFee(deliveryFee);
         savedOrder.setTotalAmount(subtotal.add(deliveryFee));
 
         savedOrder = orderRepository.save(savedOrder);
