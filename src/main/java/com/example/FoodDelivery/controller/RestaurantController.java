@@ -1,6 +1,7 @@
 package com.example.FoodDelivery.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.turkraft.springfilter.boot.Filter;
@@ -11,6 +12,9 @@ import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.service.RestaurantService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -57,6 +61,20 @@ public class RestaurantController {
     public ResponseEntity<ResultPaginationDTO> getAllRestaurants(
             @Filter Specification<Restaurant> spec, Pageable pageable) {
         ResultPaginationDTO result = restaurantService.getAllRestaurantsDTO(spec, pageable);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/restaurants/nearby")
+    @ApiMessage("Get nearby restaurants within configured distance")
+    public ResponseEntity<ResultPaginationDTO> getNearbyRestaurants(
+            @RequestParam("latitude") BigDecimal latitude,
+            @RequestParam("longitude") BigDecimal longitude,
+            @Filter Specification<Restaurant> spec,
+            Pageable pageable) throws IdInvalidException {
+        if (latitude == null || longitude == null) {
+            throw new IdInvalidException("Latitude and longitude are required");
+        }
+        ResultPaginationDTO result = restaurantService.getNearbyRestaurants(latitude, longitude, spec, pageable);
         return ResponseEntity.ok(result);
     }
 

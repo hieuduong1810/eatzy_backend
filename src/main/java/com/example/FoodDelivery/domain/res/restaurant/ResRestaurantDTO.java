@@ -31,6 +31,7 @@ public class ResRestaurantDTO {
     private String name;
     private String slug;
     private String address;
+    private String description;
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String contactPhone;
@@ -38,6 +39,7 @@ public class ResRestaurantDTO {
     private BigDecimal commissionRate;
     private BigDecimal averageRating;
     private String schedule;
+    private BigDecimal distance; // Distance in km from user location
     private RestaurantType restaurantTypes;
 
     @Getter

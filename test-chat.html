@@ -224,7 +224,7 @@
         }
 
         function connectCustomer(orderId, customerId) {
-            const socket = new SockJS('http://localhost:8080/ws');
+            const socket = new SockJS('https://eatzy-be.hoanduong.net/ws');
             customerClient = Stomp.over(socket);
 
             // ===== QUEUE VERSION (requires login header) =====
@@ -266,7 +266,7 @@
         }
 
         function connectDriver(orderId, driverId) {
-            const socket = new SockJS('http://localhost:8080/ws');
+            const socket = new SockJS('https://eatzy-be.hoanduong.net/ws');
             driverClient = Stomp.over(socket);
 
             // ===== QUEUE VERSION (requires login header) =====

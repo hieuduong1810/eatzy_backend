@@ -33,6 +33,8 @@ public class Restaurant {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    private String description;
+
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;
 
