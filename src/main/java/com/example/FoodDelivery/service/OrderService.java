@@ -1,8 +1,14 @@
 package com.example.FoodDelivery.service;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+
+import org.springframework.data.redis.core.RedisTemplate;
 
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -15,7 +21,6 @@ import com.example.FoodDelivery.domain.Dish;
 import com.example.FoodDelivery.domain.DriverProfile;
 import com.example.FoodDelivery.domain.MenuOption;
 import com.example.FoodDelivery.domain.Order;
-import com.example.FoodDelivery.domain.OrderDriverRejection;
 import com.example.FoodDelivery.domain.OrderItem;
 import com.example.FoodDelivery.domain.OrderItemOption;
 import com.example.FoodDelivery.domain.Restaurant;
@@ -28,7 +33,6 @@ import com.example.FoodDelivery.domain.res.order.ResOrderItemDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderItemOptionDTO;
 import com.example.FoodDelivery.repository.DriverProfileRepository;
 import com.example.FoodDelivery.repository.MenuOptionRepository;
-import com.example.FoodDelivery.repository.OrderDriverRejectionRepository;
 import com.example.FoodDelivery.repository.OrderRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -53,7 +57,6 @@ public class OrderService {
     private final DishService dishService;
     private final MenuOptionRepository menuOptionRepository;
     private final DriverProfileRepository driverProfileRepository;
-    private final OrderDriverRejectionRepository orderDriverRejectionRepository;
     private final PaymentService paymentService;
     private final VNPayService vnPayService;
     private final WebSocketService webSocketService;
@@ -61,19 +64,20 @@ public class OrderService {
     private final MapboxService mapboxService;
     private final DriverProfileService driverProfileService;
     private final RedisGeoService redisGeoService;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, DishService dishService,
             MenuOptionRepository menuOptionRepository, @Lazy OrderEarningsSummaryService orderEarningsSummaryService,
             DriverProfileRepository driverProfileRepository,
-            OrderDriverRejectionRepository orderDriverRejectionRepository,
             PaymentService paymentService,
             VNPayService vnPayService,
             WebSocketService webSocketService,
             SystemConfigurationService systemConfigurationService,
             MapboxService mapboxService,
             @Lazy DriverProfileService driverProfileService,
-            RedisGeoService redisGeoService) {
+            RedisGeoService redisGeoService,
+            RedisTemplate<String, Object> redisTemplate) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
@@ -81,7 +85,6 @@ public class OrderService {
         this.menuOptionRepository = menuOptionRepository;
         this.orderEarningsSummaryService = orderEarningsSummaryService;
         this.driverProfileRepository = driverProfileRepository;
-        this.orderDriverRejectionRepository = orderDriverRejectionRepository;
         this.paymentService = paymentService;
         this.vnPayService = vnPayService;
         this.webSocketService = webSocketService;
@@ -89,6 +92,7 @@ public class OrderService {
         this.mapboxService = mapboxService;
         this.driverProfileService = driverProfileService;
         this.redisGeoService = redisGeoService;
+        this.redisTemplate = redisTemplate;
     }
 
     private ResOrderDTO convertToResOrderDTO(Order order) {
@@ -860,17 +864,25 @@ public class OrderService {
             throw new IdInvalidException("This order is not assigned to you");
         }
 
-        // Save rejection record
-        OrderDriverRejection rejection = OrderDriverRejection.builder()
-                .order(order)
-                .driver(driver)
-                .rejectionReason(rejectionReason)
-                .rejectedAt(Instant.now())
-                .build();
-        orderDriverRejectionRepository.save(rejection);
+        // Save rejection to Redis SET (key: "order:{orderId}:rejected_drivers")
+        String redisKey = "order:" + orderId + ":rejected_drivers";
 
-        // Get list of all rejected driver IDs for this order
-        List<Long> rejectedDriverIds = orderDriverRejectionRepository.findRejectedDriverIdsByOrderId(orderId);
+        // Add driver ID to rejected set in Redis
+        redisTemplate.opsForSet().add(redisKey, driver.getId().toString());
+
+        // Set TTL 24 hours (auto cleanup old rejections)
+        redisTemplate.expire(redisKey, Duration.ofHours(24));
+
+        log.info("💾 Saved driver {} rejection for order {} to Redis (reason: {})",
+                driver.getId(), orderId, rejectionReason);
+
+        // Get list of all rejected driver IDs for this order from Redis
+        Set<Object> membersObj = redisTemplate.opsForSet().members(redisKey);
+        List<Long> rejectedDriverIds = membersObj != null
+                ? membersObj.stream()
+                        .map(obj -> Long.parseLong(obj.toString()))
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
 
         // Get restaurant location
         Restaurant restaurant = order.getRestaurant();
