@@ -23,7 +23,10 @@ services:
       - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET}
       - VNPAY_URL=${VNPAY_URL}
       - APP_BASE_URL=${APP_BASE_URL}
-      - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
+      - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}\
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./upload:/app/upload
     restart: always
