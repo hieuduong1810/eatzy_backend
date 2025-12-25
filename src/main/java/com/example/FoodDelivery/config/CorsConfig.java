@@ -18,7 +18,7 @@ public class CorsConfig {
 
         // Allow localhost + production origins
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-        
+
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
