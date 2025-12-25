@@ -8,8 +8,6 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 
-import org.springframework.data.redis.core.RedisTemplate;
-
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -64,7 +62,7 @@ public class OrderService {
     private final MapboxService mapboxService;
     private final DriverProfileService driverProfileService;
     private final RedisGeoService redisGeoService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisRejectionService redisRejectionService;
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, DishService dishService,
@@ -77,7 +75,7 @@ public class OrderService {
             MapboxService mapboxService,
             @Lazy DriverProfileService driverProfileService,
             RedisGeoService redisGeoService,
-            RedisTemplate<String, Object> redisTemplate) {
+            RedisRejectionService redisRejectionService) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
@@ -92,7 +90,7 @@ public class OrderService {
         this.mapboxService = mapboxService;
         this.driverProfileService = driverProfileService;
         this.redisGeoService = redisGeoService;
-        this.redisTemplate = redisTemplate;
+        this.redisRejectionService = redisRejectionService;
     }
 
     private ResOrderDTO convertToResOrderDTO(Order order) {
@@ -864,25 +862,14 @@ public class OrderService {
             throw new IdInvalidException("This order is not assigned to you");
         }
 
-        // Save rejection to Redis SET (key: "order:{orderId}:rejected_drivers")
-        String redisKey = "order:" + orderId + ":rejected_drivers";
-
-        // Add driver ID to rejected set in Redis
-        redisTemplate.opsForSet().add(redisKey, driver.getId().toString());
-
-        // Set TTL 24 hours (auto cleanup old rejections)
-        redisTemplate.expire(redisKey, Duration.ofHours(24));
+        // Save rejection to Redis using RedisRejectionService
+        redisRejectionService.addRejectedDriver(orderId, driver.getId());
 
         log.info("💾 Saved driver {} rejection for order {} to Redis (reason: {})",
                 driver.getId(), orderId, rejectionReason);
 
         // Get list of all rejected driver IDs for this order from Redis
-        Set<Object> membersObj = redisTemplate.opsForSet().members(redisKey);
-        List<Long> rejectedDriverIds = membersObj != null
-                ? membersObj.stream()
-                        .map(obj -> Long.parseLong(obj.toString()))
-                        .collect(Collectors.toList())
-                : new ArrayList<>();
+        List<Long> rejectedDriverIds = redisRejectionService.getRejectedDriverIds(orderId);
 
         // Get restaurant location
         Restaurant restaurant = order.getRestaurant();
