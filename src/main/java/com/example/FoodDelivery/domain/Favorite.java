@@ -4,13 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "customer_favorites")
+@Table(name = "favorites")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CustomerFavorite {
+public class Favorite {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,6 +19,7 @@ public class CustomerFavorite {
     @JoinColumn(name = "customer_id")
     private User customer;
 
-    private String targetType;
-    private Long targetId;
+    @ManyToOne
+    @JoinColumn(name = "restaurant_id")
+    private Restaurant restaurant;
 }

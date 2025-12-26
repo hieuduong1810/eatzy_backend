@@ -92,7 +92,7 @@ public class User {
     // Favorites (One-to-Many)
     @OneToMany(mappedBy = "customer")
     @JsonIgnore
-    private List<CustomerFavorite> favorites;
+    private List<Favorite> favorites;
 
     // Order earnings as driver (One-to-Many)
     @OneToMany(mappedBy = "driver")

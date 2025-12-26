@@ -70,6 +70,10 @@ public class Restaurant {
 
     @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
     @JsonIgnore
+    private List<Favorite> favorites;
+
+    @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<MonthlyRevenueReport> monthlyRevenueReports;
 
     @ManyToMany
