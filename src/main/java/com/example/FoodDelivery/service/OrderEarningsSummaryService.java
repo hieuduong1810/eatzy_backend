@@ -262,7 +262,7 @@ public class OrderEarningsSummaryService {
                         .amount(summary.getDriverNetEarning())
                         .balanceAfter(driverWallet.getBalance())
                         .description("Delivery earning from order #" + orderId)
-                        .relatedOrderId(orderId)
+                        .order(summary.getOrder())
                         .status("SUCCESS")
                         .transactionDate(Instant.now())
                         .createdAt(Instant.now())
@@ -291,7 +291,7 @@ public class OrderEarningsSummaryService {
                             .balanceAfter(restaurantWallet.getBalance())
                             .description("Restaurant earning from order #" + orderId + " ("
                                     + summary.getRestaurant().getName() + ")")
-                            .relatedOrderId(orderId)
+                            .order(summary.getOrder())
                             .status("SUCCESS")
                             .transactionDate(Instant.now())
                             .createdAt(Instant.now())
@@ -321,7 +321,7 @@ public class OrderEarningsSummaryService {
                                 .amount(totalCommission.negate()) // negative for deduction
                                 .balanceAfter(adminWallet.getBalance())
                                 .description("Commission paid to driver and restaurant for order #" + orderId)
-                                .relatedOrderId(orderId)
+                                .order(summary.getOrder())
                                 .status("SUCCESS")
                                 .transactionDate(Instant.now())
                                 .createdAt(Instant.now())

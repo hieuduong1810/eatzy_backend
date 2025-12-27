@@ -7,6 +7,7 @@ import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.WalletTransaction;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.walletTransaction.resWalletTransactionDTO;
 import com.example.FoodDelivery.service.WalletTransactionService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
@@ -37,65 +38,70 @@ public class WalletTransactionController {
 
     @PostMapping("/wallet-transactions")
     @ApiMessage("Create wallet transaction")
-    public ResponseEntity<WalletTransaction> createWalletTransaction(@RequestBody WalletTransaction walletTransaction)
+    public ResponseEntity<resWalletTransactionDTO> createWalletTransaction(
+            @RequestBody WalletTransaction walletTransaction)
             throws IdInvalidException {
-        WalletTransaction createdTransaction = walletTransactionService.createWalletTransaction(walletTransaction);
+        resWalletTransactionDTO createdTransaction = walletTransactionService
+                .createWalletTransaction(walletTransaction);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdTransaction);
     }
 
     @PutMapping("/wallet-transactions")
     @ApiMessage("Update wallet transaction")
-    public ResponseEntity<WalletTransaction> updateWalletTransaction(@RequestBody WalletTransaction walletTransaction)
+    public ResponseEntity<resWalletTransactionDTO> updateWalletTransaction(
+            @RequestBody WalletTransaction walletTransaction)
             throws IdInvalidException {
-        WalletTransaction updatedTransaction = walletTransactionService.updateWalletTransaction(walletTransaction);
+        resWalletTransactionDTO updatedTransaction = walletTransactionService
+                .updateWalletTransaction(walletTransaction);
         return ResponseEntity.ok(updatedTransaction);
     }
 
     @PostMapping("/wallet-transactions/deposit")
     @ApiMessage("Deposit to wallet")
-    public ResponseEntity<WalletTransaction> depositToWallet(@RequestBody Map<String, Object> body)
+    public ResponseEntity<resWalletTransactionDTO> depositToWallet(@RequestBody Map<String, Object> body)
             throws IdInvalidException {
         Long walletId = Long.valueOf(body.get("walletId").toString());
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
         String description = body.get("description") != null ? body.get("description").toString() : null;
 
-        WalletTransaction transaction = walletTransactionService.depositToWallet(walletId, amount, description);
+        resWalletTransactionDTO transaction = walletTransactionService.depositToWallet(walletId, amount, description);
         return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
     }
 
     @PostMapping("/wallet-transactions/withdraw")
     @ApiMessage("Withdraw from wallet")
-    public ResponseEntity<WalletTransaction> withdrawFromWallet(@RequestBody Map<String, Object> body)
+    public ResponseEntity<resWalletTransactionDTO> withdrawFromWallet(@RequestBody Map<String, Object> body)
             throws IdInvalidException {
         Long walletId = Long.valueOf(body.get("walletId").toString());
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
         String description = body.get("description") != null ? body.get("description").toString() : null;
 
-        WalletTransaction transaction = walletTransactionService.withdrawFromWallet(walletId, amount, description);
+        resWalletTransactionDTO transaction = walletTransactionService.withdrawFromWallet(walletId, amount,
+                description);
         return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
     }
 
     @PostMapping("/wallet-transactions/payment")
     @ApiMessage("Payment for order")
-    public ResponseEntity<WalletTransaction> paymentForOrder(@RequestBody Map<String, Object> body)
+    public ResponseEntity<resWalletTransactionDTO> paymentForOrder(@RequestBody Map<String, Object> body)
             throws IdInvalidException {
         Long walletId = Long.valueOf(body.get("walletId").toString());
         Long orderId = Long.valueOf(body.get("orderId").toString());
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
 
-        WalletTransaction transaction = walletTransactionService.paymentForOrder(walletId, orderId, amount);
+        resWalletTransactionDTO transaction = walletTransactionService.paymentForOrder(walletId, orderId, amount);
         return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
     }
 
     @PostMapping("/wallet-transactions/refund")
     @ApiMessage("Refund for order")
-    public ResponseEntity<WalletTransaction> refundForOrder(@RequestBody Map<String, Object> body)
+    public ResponseEntity<resWalletTransactionDTO> refundForOrder(@RequestBody Map<String, Object> body)
             throws IdInvalidException {
         Long walletId = Long.valueOf(body.get("walletId").toString());
         Long orderId = Long.valueOf(body.get("orderId").toString());
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
 
-        WalletTransaction transaction = walletTransactionService.refundForOrder(walletId, orderId, amount);
+        resWalletTransactionDTO transaction = walletTransactionService.refundForOrder(walletId, orderId, amount);
         return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
     }
 
@@ -109,9 +115,9 @@ public class WalletTransactionController {
 
     @GetMapping("/wallet-transactions/{id}")
     @ApiMessage("Get wallet transaction by id")
-    public ResponseEntity<WalletTransaction> getWalletTransactionById(@PathVariable("id") Long id)
+    public ResponseEntity<resWalletTransactionDTO> getWalletTransactionById(@PathVariable("id") Long id)
             throws IdInvalidException {
-        WalletTransaction transaction = walletTransactionService.getWalletTransactionById(id);
+        resWalletTransactionDTO transaction = walletTransactionService.getWalletTransactionById(id);
         if (transaction == null) {
             throw new IdInvalidException("Wallet transaction not found with id: " + id);
         }
@@ -120,24 +126,24 @@ public class WalletTransactionController {
 
     @GetMapping("/wallet-transactions/wallet/{walletId}")
     @ApiMessage("Get wallet transactions by wallet id")
-    public ResponseEntity<List<WalletTransaction>> getWalletTransactionsByWalletId(
+    public ResponseEntity<List<resWalletTransactionDTO>> getWalletTransactionsByWalletId(
             @PathVariable("walletId") Long walletId) {
-        List<WalletTransaction> transactions = walletTransactionService.getWalletTransactionsByWalletId(walletId);
+        List<resWalletTransactionDTO> transactions = walletTransactionService.getWalletTransactionsByWalletId(walletId);
         return ResponseEntity.ok(transactions);
     }
 
     @GetMapping("/wallet-transactions/order/{orderId}")
     @ApiMessage("Get wallet transactions by order id")
-    public ResponseEntity<List<WalletTransaction>> getWalletTransactionsByOrderId(
+    public ResponseEntity<List<resWalletTransactionDTO>> getWalletTransactionsByOrderId(
             @PathVariable("orderId") Long orderId) {
-        List<WalletTransaction> transactions = walletTransactionService.getWalletTransactionsByOrderId(orderId);
+        List<resWalletTransactionDTO> transactions = walletTransactionService.getWalletTransactionsByOrderId(orderId);
         return ResponseEntity.ok(transactions);
     }
 
     @DeleteMapping("/wallet-transactions/{id}")
     @ApiMessage("Delete wallet transaction by id")
     public ResponseEntity<Void> deleteWalletTransaction(@PathVariable("id") Long id) throws IdInvalidException {
-        WalletTransaction transaction = walletTransactionService.getWalletTransactionById(id);
+        resWalletTransactionDTO transaction = walletTransactionService.getWalletTransactionById(id);
         if (transaction == null) {
             throw new IdInvalidException("Wallet transaction not found with id: " + id);
         }

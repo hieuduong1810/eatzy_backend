@@ -293,15 +293,19 @@ public class VNPayService {
             if (admin != null) {
                 Wallet adminWallet = walletService.getWalletByUserId(admin.getId());
                 if (adminWallet != null) {
+                    // Get the Order object from database
+                    Order order = orderRepository.findById(Long.valueOf(vnp_TxnRef))
+                            .orElse(null);
+
                     // Create wallet transaction for admin
                     WalletTransaction adminTransaction = WalletTransaction.builder()
                             .wallet(adminWallet)
+                            .order(order)
                             .transactionType("VNPAY_RECEIVED")
                             .amount(amount)
                             .balanceAfter(adminWallet.getBalance().add(amount))
                             .description("VNPAY payment received from order #" + vnp_TxnRef + ", Transaction: "
                                     + vnp_TransactionNo)
-                            .relatedOrderId(Long.valueOf(vnp_TxnRef))
                             .status("SUCCESS")
                             .transactionDate(Instant.now())
                             .createdAt(Instant.now())

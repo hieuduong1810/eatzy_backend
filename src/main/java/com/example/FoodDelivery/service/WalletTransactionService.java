@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,7 @@ import com.example.FoodDelivery.domain.Order;
 import com.example.FoodDelivery.domain.Wallet;
 import com.example.FoodDelivery.domain.WalletTransaction;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.walletTransaction.resWalletTransactionDTO;
 import com.example.FoodDelivery.repository.WalletTransactionRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -33,25 +35,73 @@ public class WalletTransactionService {
         this.orderService = orderService;
     }
 
-    public WalletTransaction getWalletTransactionById(Long id) {
+    private resWalletTransactionDTO convertToDTO(WalletTransaction transaction) {
+        resWalletTransactionDTO dto = new resWalletTransactionDTO();
+        dto.setId(transaction.getId());
+
+        // Map Wallet
+        if (transaction.getWallet() != null) {
+            Wallet wallet = transaction.getWallet();
+            resWalletTransactionDTO.Wallet walletDTO = new resWalletTransactionDTO.Wallet();
+            walletDTO.setId(wallet.getId());
+
+            // Map User inside Wallet
+            if (wallet.getUser() != null) {
+                resWalletTransactionDTO.Wallet.User userDTO = new resWalletTransactionDTO.Wallet.User();
+                userDTO.setId(wallet.getUser().getId());
+                userDTO.setName(wallet.getUser().getName());
+                walletDTO.setUser(userDTO);
+            }
+
+            dto.setWallet(walletDTO);
+        }
+
+        // Map Order
+        if (transaction.getOrder() != null) {
+            resWalletTransactionDTO.Order orderDTO = new resWalletTransactionDTO.Order();
+            orderDTO.setId(transaction.getOrder().getId());
+            dto.setOrder(orderDTO);
+        }
+
+        dto.setAmount(transaction.getAmount());
+        dto.setTransactionType(transaction.getTransactionType());
+        dto.setDescription(transaction.getDescription());
+        dto.setStatus(transaction.getStatus());
+        dto.setBalanceAfter(transaction.getBalanceAfter());
+        dto.setCreatedAt(transaction.getCreatedAt());
+        dto.setTransactionDate(transaction.getTransactionDate());
+        return dto;
+    }
+
+    public resWalletTransactionDTO getWalletTransactionById(Long id) {
         Optional<WalletTransaction> transactionOpt = this.walletTransactionRepository.findById(id);
-        return transactionOpt.orElse(null);
+        return transactionOpt.map(this::convertToDTO).orElse(null);
     }
 
-    public List<WalletTransaction> getWalletTransactionsByWalletId(Long walletId) {
-        return this.walletTransactionRepository.findByWalletIdOrderByCreatedAtDesc(walletId);
+    public List<resWalletTransactionDTO> getWalletTransactionsByWalletId(Long walletId) {
+        return this.walletTransactionRepository.findByWalletIdOrderByCreatedAtDesc(walletId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
-    public List<WalletTransaction> getWalletTransactionsByOrderId(Long orderId) {
-        return this.walletTransactionRepository.findByOrderId(orderId);
+    public List<resWalletTransactionDTO> getWalletTransactionsByOrderId(Long orderId) {
+        return this.walletTransactionRepository.findByOrderId(orderId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
-    public List<WalletTransaction> getWalletTransactionsByWalletIdAndType(Long walletId, String transactionType) {
-        return this.walletTransactionRepository.findByWalletIdAndTransactionType(walletId, transactionType);
+    public List<resWalletTransactionDTO> getWalletTransactionsByWalletIdAndType(Long walletId, String transactionType) {
+        return this.walletTransactionRepository.findByWalletIdAndTransactionType(walletId, transactionType)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public WalletTransaction createWalletTransaction(WalletTransaction walletTransaction) throws IdInvalidException {
+    public resWalletTransactionDTO createWalletTransaction(WalletTransaction walletTransaction)
+            throws IdInvalidException {
         // check wallet exists
         if (walletTransaction.getWallet() != null) {
             Wallet wallet = this.walletService.getWalletById(walletTransaction.getWallet().getId());
@@ -96,13 +146,16 @@ public class WalletTransactionService {
             updateWalletBalance(walletTransaction);
         }
 
-        return savedTransaction;
+        return convertToDTO(savedTransaction);
     }
 
     @Transactional
-    public WalletTransaction updateWalletTransaction(WalletTransaction walletTransaction) throws IdInvalidException {
+    public resWalletTransactionDTO updateWalletTransaction(WalletTransaction walletTransaction)
+            throws IdInvalidException {
         // check id
-        WalletTransaction currentTransaction = getWalletTransactionById(walletTransaction.getId());
+        Optional<WalletTransaction> transactionOpt = this.walletTransactionRepository
+                .findById(walletTransaction.getId());
+        WalletTransaction currentTransaction = transactionOpt.orElse(null);
         if (currentTransaction == null) {
             throw new IdInvalidException("Wallet transaction not found with id: " + walletTransaction.getId());
         }
@@ -124,11 +177,11 @@ public class WalletTransactionService {
             updateWalletBalance(currentTransaction);
         }
 
-        return updatedTransaction;
+        return convertToDTO(updatedTransaction);
     }
 
     @Transactional
-    public WalletTransaction depositToWallet(Long walletId, BigDecimal amount, String description)
+    public resWalletTransactionDTO depositToWallet(Long walletId, BigDecimal amount, String description)
             throws IdInvalidException {
         Wallet wallet = this.walletService.getWalletById(walletId);
         if (wallet == null) {
@@ -154,11 +207,11 @@ public class WalletTransactionService {
         // update wallet balance
         walletService.addBalance(walletId, amount);
 
-        return savedTransaction;
+        return convertToDTO(savedTransaction);
     }
 
     @Transactional
-    public WalletTransaction withdrawFromWallet(Long walletId, BigDecimal amount, String description)
+    public resWalletTransactionDTO withdrawFromWallet(Long walletId, BigDecimal amount, String description)
             throws IdInvalidException {
         Wallet wallet = this.walletService.getWalletById(walletId);
         if (wallet == null) {
@@ -188,11 +241,12 @@ public class WalletTransactionService {
         // update wallet balance
         walletService.subtractBalance(walletId, amount);
 
-        return savedTransaction;
+        return convertToDTO(savedTransaction);
     }
 
     @Transactional
-    public WalletTransaction paymentForOrder(Long walletId, Long orderId, BigDecimal amount) throws IdInvalidException {
+    public resWalletTransactionDTO paymentForOrder(Long walletId, Long orderId, BigDecimal amount)
+            throws IdInvalidException {
         Wallet wallet = this.walletService.getWalletById(walletId);
         if (wallet == null) {
             throw new IdInvalidException("Wallet not found with id: " + walletId);
@@ -227,11 +281,12 @@ public class WalletTransactionService {
         // update wallet balance
         walletService.subtractBalance(walletId, amount);
 
-        return savedTransaction;
+        return convertToDTO(savedTransaction);
     }
 
     @Transactional
-    public WalletTransaction refundForOrder(Long walletId, Long orderId, BigDecimal amount) throws IdInvalidException {
+    public resWalletTransactionDTO refundForOrder(Long walletId, Long orderId, BigDecimal amount)
+            throws IdInvalidException {
         Wallet wallet = this.walletService.getWalletById(walletId);
         if (wallet == null) {
             throw new IdInvalidException("Wallet not found with id: " + walletId);
@@ -262,7 +317,7 @@ public class WalletTransactionService {
         // update wallet balance
         walletService.addBalance(walletId, amount);
 
-        return savedTransaction;
+        return convertToDTO(savedTransaction);
     }
 
     private void updateWalletBalance(WalletTransaction transaction) throws IdInvalidException {
@@ -280,6 +335,13 @@ public class WalletTransactionService {
 
     public ResultPaginationDTO getAllWalletTransactions(Specification<WalletTransaction> spec, Pageable pageable) {
         Page<WalletTransaction> page = this.walletTransactionRepository.findAll(spec, pageable);
+
+        // Convert entities to DTOs
+        List<resWalletTransactionDTO> dtoList = page.getContent()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+
         ResultPaginationDTO result = new ResultPaginationDTO();
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber() + 1);
@@ -287,7 +349,7 @@ public class WalletTransactionService {
         meta.setTotal(page.getTotalElements());
         meta.setPages(page.getTotalPages());
         result.setMeta(meta);
-        result.setResult(page.getContent());
+        result.setResult(dtoList);
         return result;
     }
 

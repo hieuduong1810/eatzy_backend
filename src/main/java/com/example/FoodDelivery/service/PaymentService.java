@@ -81,7 +81,7 @@ public class PaymentService {
                 .amount(totalAmount.negate()) // negative for deduction
                 .balanceAfter(customerWallet.getBalance().add(totalAmount.negate()))
                 .description("Payment for order #" + order.getId())
-                .relatedOrderId(order.getId())
+                .order(order)
                 .status("SUCCESS")
                 .transactionDate(Instant.now())
                 .build();
@@ -99,7 +99,7 @@ public class PaymentService {
                         .amount(totalAmount)
                         .balanceAfter(adminWallet.getBalance().add(totalAmount))
                         .description("Payment received from order #" + order.getId())
-                        .relatedOrderId(order.getId())
+                        .order(order)
                         .status("SUCCESS")
                         .transactionDate(Instant.now())
                         .build();
@@ -166,7 +166,7 @@ public class PaymentService {
                 .amount(refundAmount.negate()) // negative for deduction
                 .balanceAfter(adminWallet.getBalance().add(refundAmount.negate()))
                 .description("Refund for order #" + order.getId())
-                .relatedOrderId(order.getId())
+                .order(order)
                 .status("SUCCESS")
                 .transactionDate(Instant.now())
                 .build();
@@ -179,7 +179,7 @@ public class PaymentService {
                 .amount(refundAmount)
                 .balanceAfter(customerWallet.getBalance().add(refundAmount))
                 .description("Refund for order #" + order.getId())
-                .relatedOrderId(order.getId())
+                .order(order)
                 .status("SUCCESS")
                 .transactionDate(Instant.now())
                 .build();
@@ -288,7 +288,7 @@ public class PaymentService {
                 .amount(totalAmount.negate()) // negative for deduction
                 .balanceAfter(driverWallet.getBalance())
                 .description("Payment for order #" + order.getId())
-                .relatedOrderId(order.getId())
+                .order(order)
                 .transactionDate(Instant.now())
                 .build();
         walletTransactionService.createWalletTransaction(driverTransaction);
@@ -313,7 +313,7 @@ public class PaymentService {
                 .amount(totalAmount)
                 .balanceAfter(adminWallet.getBalance())
                 .description("COD payment received from order #" + order.getId())
-                .relatedOrderId(order.getId())
+                .order(order)
                 .transactionDate(Instant.now())
                 .build();
         walletTransactionService.createWalletTransaction(adminTransaction);
