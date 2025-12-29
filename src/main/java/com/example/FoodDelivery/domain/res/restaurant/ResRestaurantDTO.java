@@ -37,6 +37,11 @@ public class ResRestaurantDTO {
     private String contactPhone;
     private String status;
     private BigDecimal commissionRate;
+    private Integer oneStarCount;
+    private Integer twoStarCount;
+    private Integer threeStarCount;
+    private Integer fourStarCount;
+    private Integer fiveStarCount;
     private BigDecimal averageRating;
     private String schedule;
     private BigDecimal distance; // Distance in km from user location

@@ -115,6 +115,15 @@ public class ReviewService {
             if (order == null) {
                 throw new IdInvalidException("Order not found with id: " + review.getOrder().getId());
             }
+            // check if current user is the customer of this order
+            if (!order.getCustomer().getId().equals(customer.getId())) {
+                throw new IdInvalidException("You are not allowed to review this order");
+            }
+            // check if this order has already been reviewed by this customer
+            List<Review> existingReviews = this.reviewRepository.findByOrderId(order.getId());
+            if (!existingReviews.isEmpty()) {
+                throw new IdInvalidException("You have already reviewed this order");
+            }
             // check order status
             if (!"DELIVERED".equals(order.getOrderStatus())) {
                 throw new IdInvalidException("Only delivered orders can be reviewed");
@@ -170,9 +179,21 @@ public class ReviewService {
                     .average()
                     .orElse(0.0);
 
+            // Count reviews by star rating
+            int oneStarCount = (int) reviews.stream().filter(r -> r.getRating() == 1).count();
+            int twoStarCount = (int) reviews.stream().filter(r -> r.getRating() == 2).count();
+            int threeStarCount = (int) reviews.stream().filter(r -> r.getRating() == 3).count();
+            int fourStarCount = (int) reviews.stream().filter(r -> r.getRating() == 4).count();
+            int fiveStarCount = (int) reviews.stream().filter(r -> r.getRating() == 5).count();
+
             Restaurant restaurant = this.restaurantRepository.findByName(restaurantName).orElse(null);
             if (restaurant != null) {
                 restaurant.setAverageRating(BigDecimal.valueOf(averageRating).setScale(2, RoundingMode.HALF_UP));
+                restaurant.setOneStarCount(oneStarCount);
+                restaurant.setTwoStarCount(twoStarCount);
+                restaurant.setThreeStarCount(threeStarCount);
+                restaurant.setFourStarCount(fourStarCount);
+                restaurant.setFiveStarCount(fiveStarCount);
                 this.restaurantRepository.save(restaurant);
             }
         }

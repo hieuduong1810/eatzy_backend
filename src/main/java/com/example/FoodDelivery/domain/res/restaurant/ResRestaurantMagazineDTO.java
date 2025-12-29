@@ -17,6 +17,11 @@ public class ResRestaurantMagazineDTO {
     private String slug;
     private String address;
     private String description;
+    private Integer oneStarCount;
+    private Integer twoStarCount;
+    private Integer threeStarCount;
+    private Integer fourStarCount;
+    private Integer fiveStarCount;
     private BigDecimal averageRating;
     private BigDecimal distance;
     private List<Category> category;

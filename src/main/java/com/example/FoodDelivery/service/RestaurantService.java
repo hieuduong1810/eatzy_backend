@@ -67,6 +67,11 @@ public class RestaurantService {
         dto.setContactPhone(restaurant.getContactPhone());
         dto.setStatus(restaurant.getStatus());
         dto.setCommissionRate(restaurant.getCommissionRate());
+        dto.setOneStarCount(restaurant.getOneStarCount());
+        dto.setTwoStarCount(restaurant.getTwoStarCount());
+        dto.setThreeStarCount(restaurant.getThreeStarCount());
+        dto.setFourStarCount(restaurant.getFourStarCount());
+        dto.setFiveStarCount(restaurant.getFiveStarCount());
         dto.setAverageRating(restaurant.getAverageRating());
         dto.setSchedule(restaurant.getSchedule());
 
@@ -96,6 +101,11 @@ public class RestaurantService {
         dto.setSlug(restaurant.getSlug());
         dto.setAddress(restaurant.getAddress());
         dto.setDescription(restaurant.getDescription());
+        dto.setOneStarCount(restaurant.getOneStarCount());
+        dto.setTwoStarCount(restaurant.getTwoStarCount());
+        dto.setThreeStarCount(restaurant.getThreeStarCount());
+        dto.setFourStarCount(restaurant.getFourStarCount());
+        dto.setFiveStarCount(restaurant.getFiveStarCount());
         dto.setAverageRating(restaurant.getAverageRating());
 
         // Convert dish categories and dishes

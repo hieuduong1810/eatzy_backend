@@ -50,6 +50,21 @@ public class Restaurant {
     @Column(precision = 3, scale = 2)
     private BigDecimal averageRating;
 
+    @Column(name = "one_star_count")
+    private Integer oneStarCount;
+
+    @Column(name = "two_star_count")
+    private Integer twoStarCount;
+
+    @Column(name = "three_star_count")
+    private Integer threeStarCount;
+
+    @Column(name = "four_star_count")
+    private Integer fourStarCount;
+
+    @Column(name = "five_star_count")
+    private Integer fiveStarCount;
+
     private String schedule; // e.g., "09:00-21:00"
 
     @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
