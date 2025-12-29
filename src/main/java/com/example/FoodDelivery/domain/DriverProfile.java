@@ -40,6 +40,8 @@ public class DriverProfile {
     @Column(precision = 10, scale = 2)
     private BigDecimal codLimit;
 
+    private Integer completedTrips;
+
     // National ID (CCCD/CMND/Passport)
     @JsonProperty("national_id_front")
     private String nationalIdFront;

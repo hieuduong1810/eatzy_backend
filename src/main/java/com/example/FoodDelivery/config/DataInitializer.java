@@ -185,6 +185,7 @@ public class DataInitializer implements CommandLineRunner {
                                 .currentLongitude(new BigDecimal("106.660172"))
                                 .averageRating(new BigDecimal("4.85"))
                                 .codLimit(new BigDecimal("2000000"))
+                                .completedTrips(150)
                                 .nationalIdFront("front.jpg")
                                 .nationalIdBack("back.jpg")
                                 .nationalIdNumber("079203004455")

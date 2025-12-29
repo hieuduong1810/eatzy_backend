@@ -23,6 +23,7 @@ public class ResDriverProfileDTO {
     private BigDecimal currentLongitude;
     private BigDecimal averageRating;
     private BigDecimal codLimit;
+    private Integer completedTrips;
 
     // National ID
     @JsonProperty("national_id_front")

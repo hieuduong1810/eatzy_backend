@@ -362,6 +362,7 @@ public class DriverProfileService {
         dto.setCurrentLongitude(profile.getCurrentLongitude());
         dto.setAverageRating(profile.getAverageRating());
         dto.setCodLimit(profile.getCodLimit());
+        dto.setCompletedTrips(profile.getCompletedTrips());
 
         // User info (only id, name, email)
         if (profile.getUser() != null) {

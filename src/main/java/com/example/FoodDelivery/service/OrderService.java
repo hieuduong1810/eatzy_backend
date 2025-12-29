@@ -105,9 +105,19 @@ public class OrderService {
         dto.setDeliveryLongitude(order.getDeliveryLongitude());
         dto.setSpecialInstructions(order.getSpecialInstructions());
         dto.setSubtotal(order.getSubtotal());
-        dto.setDeliveryFee(order.getDeliveryFee());
+
+        // Format delivery fee to 2 decimal places
+        dto.setDeliveryFee(order.getDeliveryFee() != null
+                ? order.getDeliveryFee().setScale(2, java.math.RoundingMode.HALF_UP)
+                : null);
+
         dto.setDiscountAmount(order.getDiscountAmount());
-        dto.setTotalAmount(order.getTotalAmount());
+
+        // Format total amount to 2 decimal places
+        dto.setTotalAmount(order.getTotalAmount() != null
+                ? order.getTotalAmount().setScale(2, java.math.RoundingMode.HALF_UP)
+                : null);
+
         dto.setPaymentMethod(order.getPaymentMethod());
         dto.setPaymentStatus(order.getPaymentStatus());
         dto.setCancellationReason(order.getCancellationReason());
@@ -115,9 +125,15 @@ public class OrderService {
         dto.setPreparingAt(order.getPreparingAt());
         dto.setDeliveredAt(order.getDeliveredAt());
 
+        // Calculate total trip duration in minutes (from createdAt to deliveredAt)
+        if (order.getCreatedAt() != null && order.getDeliveredAt() != null) {
+            Duration duration = Duration.between(order.getCreatedAt(), order.getDeliveredAt());
+            dto.setTotalTripDuration(duration.toMinutes());
+        }
+
         // Convert customer
         if (order.getCustomer() != null) {
-            ResOrderDTO.User customer = new ResOrderDTO.User();
+            ResOrderDTO.Customer customer = new ResOrderDTO.Customer();
             customer.setId(order.getCustomer().getId());
             customer.setName(order.getCustomer().getName());
             dto.setCustomer(customer);
@@ -132,11 +148,35 @@ public class OrderService {
             dto.setRestaurant(restaurant);
         }
 
+        BigDecimal distance = mapboxService.getDrivingDistance(
+                order.getRestaurant().getLatitude(),
+                order.getRestaurant().getLongitude(),
+                order.getDeliveryLatitude(),
+                order.getDeliveryLongitude());
+        // Get distance from order entity and format to 2 decimal places
+        dto.setDistance(distance != null
+                ? distance.setScale(2, java.math.RoundingMode.HALF_UP)
+                : null);
+
         // Convert driver
         if (order.getDriver() != null) {
-            ResOrderDTO.User driver = new ResOrderDTO.User();
+            ResOrderDTO.Driver driver = new ResOrderDTO.Driver();
             driver.setId(order.getDriver().getId());
             driver.setName(order.getDriver().getName());
+
+            // Get driver profile for additional information
+            Optional<DriverProfile> driverProfileOpt = driverProfileRepository.findByUserId(order.getDriver().getId());
+            if (driverProfileOpt.isPresent()) {
+                DriverProfile driverProfile = driverProfileOpt.get();
+                driver.setVehicleType(driverProfile.getVehicleType());
+                driver.setAverageRating(
+                        driverProfile.getAverageRating() != null ? driverProfile.getAverageRating().toString() : null);
+                driver.setCompletedTrips(
+                        driverProfile.getCompletedTrips() != null ? driverProfile.getCompletedTrips().toString()
+                                : null);
+                driver.setVehicleLicensePlate(driverProfile.getVehicleLicensePlate());
+            }
+
             dto.setDriver(driver);
         }
 
@@ -242,10 +282,10 @@ public class OrderService {
 
         // Get real driving distance using Mapbox API
         BigDecimal distance = mapboxService.getDrivingDistance(
-                restaurant.getLongitude(),
                 restaurant.getLatitude(),
-                deliveryLongitude,
-                deliveryLatitude);
+                restaurant.getLongitude(),
+                deliveryLatitude,
+                deliveryLongitude);
 
         if (distance == null) {
             log.warn("Failed to get driving distance from Mapbox, using base fee");
@@ -1188,6 +1228,16 @@ public class OrderService {
 
         if ("COD".equals(order.getPaymentMethod())) {
             order.setPaymentStatus("PAID");
+        }
+
+        // Update driver's completed trips count
+        Optional<DriverProfile> driverProfileOpt = driverProfileRepository.findByUserId(driver.getId());
+        if (driverProfileOpt.isPresent()) {
+            DriverProfile driverProfile = driverProfileOpt.get();
+            Integer currentTrips = driverProfile.getCompletedTrips() != null ? driverProfile.getCompletedTrips() : 0;
+            driverProfile.setCompletedTrips(currentTrips + 1);
+            driverProfileRepository.save(driverProfile);
+            log.info("Updated driver {} completed trips to {}", driver.getId(), currentTrips + 1);
         }
 
         // Create earnings summary when order is delivered

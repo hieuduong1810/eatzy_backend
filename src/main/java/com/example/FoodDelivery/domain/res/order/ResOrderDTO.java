@@ -15,14 +15,15 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ResOrderDTO {
     private Long id;
-    private User customer;
+    private Customer customer;
     private Restaurant restaurant;
-    private User driver;
+    private Driver driver;
     private Voucher voucher;
     private String orderStatus;
     private String deliveryAddress;
     private BigDecimal deliveryLatitude;
     private BigDecimal deliveryLongitude;
+    private BigDecimal distance;
     private String specialInstructions;
     private BigDecimal subtotal;
     private BigDecimal deliveryFee;
@@ -34,6 +35,7 @@ public class ResOrderDTO {
     private Instant createdAt;
     private Instant preparingAt;
     private Instant deliveredAt;
+    private Long totalTripDuration; // Total trip duration in minutes
     private List<ResOrderItemDTO> orderItems;
     private String vnpayPaymentUrl; // VNPAY payment URL if payment method is VNPAY
 
@@ -41,9 +43,22 @@ public class ResOrderDTO {
     @Setter
     @AllArgsConstructor
     @NoArgsConstructor
-    public static class User {
+    public static class Customer {
         private long id;
         private String name;
+    }
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class Driver {
+        private long id;
+        private String name;
+        private String vehicleType;
+        private String averageRating;
+        private String completedTrips;
+        private String vehicleLicensePlate;
     }
 
     @Getter
