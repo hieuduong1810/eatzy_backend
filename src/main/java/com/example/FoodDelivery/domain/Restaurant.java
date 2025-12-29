@@ -81,6 +81,10 @@ public class Restaurant {
 
     @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
     @JsonIgnore
+    private List<Cart> carts;
+
+    @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Voucher> vouchers;
 
     @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)

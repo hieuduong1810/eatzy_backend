@@ -114,6 +114,10 @@ public class User {
     @JsonIgnore
     private List<SystemConfiguration> systemConfigurations;
 
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Cart> carts;
+
     @PrePersist
     public void handleBeforeCreate() {
         this.createdBy = SecurityUtil.getCurrentUserLogin().isPresent()

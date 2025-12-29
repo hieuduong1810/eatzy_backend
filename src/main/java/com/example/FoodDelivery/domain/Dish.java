@@ -38,4 +38,7 @@ public class Dish {
 
     @OneToMany(mappedBy = "dish")
     private List<OrderItem> orderItems;
+
+    @OneToMany(mappedBy = "dish")
+    private List<CartItem> cartItems;
 }

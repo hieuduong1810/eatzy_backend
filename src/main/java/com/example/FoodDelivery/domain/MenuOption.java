@@ -35,4 +35,8 @@ public class MenuOption {
     @OneToMany(mappedBy = "menuOption", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<OrderItemOption> orderItemOptions;
+
+    @OneToMany(mappedBy = "menuOption", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<CartItemOption> cartItemOptions;
 }
