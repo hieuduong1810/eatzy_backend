@@ -1,4 +1,4 @@
-# 🍕 Eatzy - Food Delivery Backend API
+# 🍕 Eatzy - Food Delivery Backend APII
 
 <div align="center">
 
