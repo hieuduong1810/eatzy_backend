@@ -1,6 +1,5 @@
 package com.example.FoodDelivery.domain.res.restaurant;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
@@ -12,8 +11,8 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ResRestaurantMenuDTO {
+public class ResDishCategoryDTO {
     private Long id;
     private String name;
-    private List<ResDishCategoryDTO> dishes;
+    private List<ResDishDTO> dishes;
 }

@@ -41,4 +41,7 @@ public class Dish {
 
     @OneToMany(mappedBy = "dish")
     private List<CartItem> cartItems;
+
+    @OneToMany(mappedBy = "dish")
+    private List<MenuOptionGroup> menuOptionGroups;
 }

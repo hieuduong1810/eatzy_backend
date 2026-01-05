@@ -16,6 +16,7 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMagazineDTO;
+import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO;
 import com.example.FoodDelivery.repository.RestaurantRepository;
 import com.example.FoodDelivery.repository.RestaurantTypeRepository;
 import com.example.FoodDelivery.util.SlugUtils;
@@ -89,6 +90,85 @@ public class RestaurantService {
             type.setId(restaurant.getRestaurantTypes().get(0).getId());
             type.setName(restaurant.getRestaurantTypes().get(0).getName());
             dto.setRestaurantTypes(type);
+        }
+
+        return dto;
+    }
+
+    private ResRestaurantMenuDTO convertToResRestaurantMenuDTO(Restaurant restaurant) {
+        ResRestaurantMenuDTO dto = new ResRestaurantMenuDTO();
+        dto.setId(restaurant.getId());
+        dto.setName(restaurant.getName());
+
+        // Convert dish categories and dishes
+        if (restaurant.getDishCategories() != null && !restaurant.getDishCategories().isEmpty()) {
+            List<com.example.FoodDelivery.domain.res.restaurant.ResDishCategoryDTO> categories = restaurant
+                    .getDishCategories().stream()
+                    .map(dishCategory -> {
+                        com.example.FoodDelivery.domain.res.restaurant.ResDishCategoryDTO category = new com.example.FoodDelivery.domain.res.restaurant.ResDishCategoryDTO();
+                        category.setId(dishCategory.getId());
+                        category.setName(dishCategory.getName());
+
+                        // Convert dishes for this category
+                        if (dishCategory.getDishes() != null && !dishCategory.getDishes().isEmpty()) {
+                            List<com.example.FoodDelivery.domain.res.restaurant.ResDishDTO> dishes = dishCategory
+                                    .getDishes().stream()
+                                    .map(dish -> {
+                                        com.example.FoodDelivery.domain.res.restaurant.ResDishDTO dishDTO = new com.example.FoodDelivery.domain.res.restaurant.ResDishDTO();
+                                        dishDTO.setId(dish.getId());
+                                        dishDTO.setName(dish.getName());
+                                        dishDTO.setDescription(dish.getDescription());
+                                        dishDTO.setPrice(dish.getPrice());
+                                        dishDTO.setAvailabilityQuantity(dish.getAvailabilityQuantity());
+                                        dishDTO.setImageUrl(dish.getImageUrl());
+
+                                        // Convert menu option groups
+                                        if (dish.getMenuOptionGroups() != null
+                                                && !dish.getMenuOptionGroups().isEmpty()) {
+                                            List<com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO> optionGroups = dish
+                                                    .getMenuOptionGroups().stream()
+                                                    .map(optionGroup -> {
+                                                        com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO groupDTO = new com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO();
+                                                        groupDTO.setId(optionGroup.getId());
+                                                        groupDTO.setName(optionGroup.getGroupName());
+
+                                                        // Convert menu options
+                                                        if (optionGroup.getMenuOptions() != null
+                                                                && !optionGroup.getMenuOptions().isEmpty()) {
+                                                            List<com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionDTO> options = optionGroup
+                                                                    .getMenuOptions().stream()
+                                                                    .map(option -> {
+                                                                        com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionDTO optionDTO = new com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionDTO();
+                                                                        optionDTO.setId(option.getId());
+                                                                        optionDTO.setName(option.getName());
+                                                                        optionDTO.setPriceAdjustment(
+                                                                                option.getPriceAdjustment());
+                                                                        optionDTO.setAvailable(option.getIsAvailable());
+                                                                        return optionDTO;
+                                                                    })
+                                                                    .collect(Collectors.toList());
+                                                            groupDTO.setMenuOptions(options);
+                                                        }
+
+                                                        return groupDTO;
+                                                    })
+                                                    .collect(Collectors.toList());
+                                            dishDTO.setMenuOptionGroups(optionGroups);
+                                            dishDTO.setMenuOptionGroupCount(optionGroups.size());
+                                        } else {
+                                            dishDTO.setMenuOptionGroupCount(0);
+                                        }
+
+                                        return dishDTO;
+                                    })
+                                    .collect(Collectors.toList());
+                            category.setDishes(dishes);
+                        }
+
+                        return category;
+                    })
+                    .collect(Collectors.toList());
+            dto.setDishes(categories);
         }
 
         return dto;
@@ -168,6 +248,14 @@ public class RestaurantService {
             return null;
         }
         return convertToResRestaurantDTO(restaurant);
+    }
+
+    public com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO getRestaurantMenuDTOById(Long id) {
+        Restaurant restaurant = getRestaurantById(id);
+        if (restaurant == null) {
+            return null;
+        }
+        return convertToResRestaurantMenuDTO(restaurant);
     }
 
     public Restaurant createRestaurant(Restaurant restaurant) throws IdInvalidException {

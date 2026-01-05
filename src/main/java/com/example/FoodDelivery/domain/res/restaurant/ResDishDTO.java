@@ -12,8 +12,13 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ResRestaurantMenuDTO {
+public class ResDishDTO {
     private Long id;
     private String name;
-    private List<ResDishCategoryDTO> dishes;
+    private String description;
+    private BigDecimal price;
+    private int availabilityQuantity;
+    private String imageUrl;
+    private int menuOptionGroupCount;
+    private List<ResMenuOptionGroupDTO> menuOptionGroups;
 }

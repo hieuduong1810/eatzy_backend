@@ -83,6 +83,12 @@ public class CartService {
                             itemDto.setDish(dish);
                         }
 
+                        // Calculate total price: dish price + all option price adjustments
+                        java.math.BigDecimal totalPrice = java.math.BigDecimal.ZERO;
+                        if (cartItem.getDish() != null && cartItem.getDish().getPrice() != null) {
+                            totalPrice = cartItem.getDish().getPrice();
+                        }
+
                         // Convert cart item options
                         if (cartItem.getCartItemOptions() != null && !cartItem.getCartItemOptions().isEmpty()) {
                             List<ResCartItemOptionDTO> optionDtos = cartItem.getCartItemOptions().stream()
@@ -103,7 +109,17 @@ public class CartService {
                                     })
                                     .collect(Collectors.toList());
                             itemDto.setCartItemOptions(optionDtos);
+
+                            // Add all option price adjustments to total price
+                            for (CartItemOption option : cartItem.getCartItemOptions()) {
+                                if (option.getMenuOption() != null
+                                        && option.getMenuOption().getPriceAdjustment() != null) {
+                                    totalPrice = totalPrice.add(option.getMenuOption().getPriceAdjustment());
+                                }
+                            }
                         }
+
+                        itemDto.setTotalPrice(totalPrice);
 
                         return itemDto;
                     })

@@ -16,6 +16,7 @@ public class ResCartItemDTO {
     private Long id;
     private Dish dish;
     private Integer quantity;
+    private BigDecimal totalPrice;
     private List<ResCartItemOptionDTO> cartItemOptions;
 
     @Getter

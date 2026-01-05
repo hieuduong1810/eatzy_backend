@@ -19,6 +19,7 @@ import com.example.FoodDelivery.domain.Dish;
 import com.example.FoodDelivery.domain.DriverProfile;
 import com.example.FoodDelivery.domain.MenuOption;
 import com.example.FoodDelivery.domain.Order;
+import com.example.FoodDelivery.domain.OrderEarningsSummary;
 import com.example.FoodDelivery.domain.OrderItem;
 import com.example.FoodDelivery.domain.OrderItemOption;
 import com.example.FoodDelivery.domain.Restaurant;
@@ -32,6 +33,7 @@ import com.example.FoodDelivery.domain.res.order.ResOrderItemDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderItemOptionDTO;
 import com.example.FoodDelivery.repository.DriverProfileRepository;
 import com.example.FoodDelivery.repository.MenuOptionRepository;
+import com.example.FoodDelivery.repository.OrderEarningsSummaryRepository;
 import com.example.FoodDelivery.repository.OrderRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -65,6 +67,7 @@ public class OrderService {
     private final DriverProfileService driverProfileService;
     private final RedisGeoService redisGeoService;
     private final RedisRejectionService redisRejectionService;
+    private final OrderEarningsSummaryRepository orderEarningsSummaryRepository;
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, VoucherService voucherService, DishService dishService,
@@ -77,7 +80,8 @@ public class OrderService {
             MapboxService mapboxService,
             @Lazy DriverProfileService driverProfileService,
             RedisGeoService redisGeoService,
-            RedisRejectionService redisRejectionService) {
+            RedisRejectionService redisRejectionService,
+            OrderEarningsSummaryRepository orderEarningsSummaryRepository) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
@@ -94,6 +98,7 @@ public class OrderService {
         this.driverProfileService = driverProfileService;
         this.redisGeoService = redisGeoService;
         this.redisRejectionService = redisRejectionService;
+        this.orderEarningsSummaryRepository = orderEarningsSummaryRepository;
     }
 
     private ResOrderDTO convertToResOrderDTO(Order order) {
@@ -136,6 +141,7 @@ public class OrderService {
             ResOrderDTO.Customer customer = new ResOrderDTO.Customer();
             customer.setId(order.getCustomer().getId());
             customer.setName(order.getCustomer().getName());
+            customer.setPhoneNumber(order.getCustomer().getPhoneNumber());
             dto.setCustomer(customer);
         }
 
@@ -163,6 +169,7 @@ public class OrderService {
             ResOrderDTO.Driver driver = new ResOrderDTO.Driver();
             driver.setId(order.getDriver().getId());
             driver.setName(order.getDriver().getName());
+            driver.setPhoneNumber(order.getDriver().getPhoneNumber());
 
             // Get driver profile for additional information
             Optional<DriverProfile> driverProfileOpt = driverProfileRepository.findByUserId(order.getDriver().getId());
@@ -175,6 +182,7 @@ public class OrderService {
                         driverProfile.getCompletedTrips() != null ? driverProfile.getCompletedTrips().toString()
                                 : null);
                 driver.setVehicleLicensePlate(driverProfile.getVehicleLicensePlate());
+                driver.setVehicleDetails(driverProfile.getVehicleDetails());
             }
 
             dto.setDriver(driver);
@@ -232,6 +240,16 @@ public class OrderService {
                     })
                     .collect(Collectors.toList());
             dto.setOrderItems(orderItemDtos);
+        }
+
+        // Get earnings summary information
+        Optional<OrderEarningsSummary> earningsSummaryOpt = orderEarningsSummaryRepository.findByOrderId(order.getId());
+        if (earningsSummaryOpt.isPresent()) {
+            OrderEarningsSummary earningsSummary = earningsSummaryOpt.get();
+            dto.setRestaurantCommissionAmount(earningsSummary.getRestaurantCommissionAmount());
+            dto.setRestaurantNetEarning(earningsSummary.getRestaurantNetEarning());
+            dto.setDriverCommissionAmount(earningsSummary.getDriverCommissionAmount());
+            dto.setDriverNetEarning(earningsSummary.getDriverNetEarning());
         }
 
         return dto;

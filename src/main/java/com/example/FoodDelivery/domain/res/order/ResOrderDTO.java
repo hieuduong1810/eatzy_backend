@@ -26,7 +26,11 @@ public class ResOrderDTO {
     private BigDecimal distance;
     private String specialInstructions;
     private BigDecimal subtotal;
+    private BigDecimal restaurantCommissionAmount;
+    private BigDecimal restaurantNetEarning;
     private BigDecimal deliveryFee;
+    private BigDecimal driverCommissionAmount;
+    private BigDecimal driverNetEarning;
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String paymentMethod;
@@ -46,6 +50,7 @@ public class ResOrderDTO {
     public static class Customer {
         private long id;
         private String name;
+        private String phoneNumber;
     }
 
     @Getter
@@ -56,9 +61,11 @@ public class ResOrderDTO {
         private long id;
         private String name;
         private String vehicleType;
+        private String vehicleDetails;
         private String averageRating;
         private String completedTrips;
         private String vehicleLicensePlate;
+        private String phoneNumber;
     }
 
     @Getter

@@ -90,6 +90,18 @@ public class RestaurantController {
         return ResponseEntity.ok(restaurant);
     }
 
+    @GetMapping("/restaurants/{id}/menu")
+    @ApiMessage("Get restaurant menu by id")
+    public ResponseEntity<com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO> getRestaurantMenu(
+            @PathVariable("id") Long id) throws IdInvalidException {
+        com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO menu = restaurantService
+                .getRestaurantMenuDTOById(id);
+        if (menu == null) {
+            throw new IdInvalidException("Restaurant not found with id: " + id);
+        }
+        return ResponseEntity.ok(menu);
+    }
+
     @GetMapping("/restaurants/slug/{slug}")
     @ApiMessage("Get restaurant by slug")
     public ResponseEntity<ResRestaurantDTO> getRestaurantBySlug(@PathVariable("slug") String slug)
