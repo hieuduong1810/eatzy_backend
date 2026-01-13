@@ -22,7 +22,6 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.req.ReqLoginDTO;
 import com.example.FoodDelivery.domain.res.ResLoginDTO;
 import com.example.FoodDelivery.domain.res.user.ResCreateUserDTO;
-import com.example.FoodDelivery.service.RedisSessionService;
 import com.example.FoodDelivery.service.UserService;
 import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
@@ -38,19 +37,16 @@ public class AuthController {
         private final SecurityUtil securityUtil;
         private final UserService userService;
         private final PasswordEncoder passwordEncoder;
-        private final RedisSessionService redisSessionService;
 
         @Value("${foodDelivery.jwt.refresh-token-validity-in-seconds}")
         private long refreshTokenExpiration;
 
         public AuthController(AuthenticationManagerBuilder authenticationManagerBuilder, SecurityUtil securityUtil,
-                        UserService userService, PasswordEncoder passwordEncoder,
-                        RedisSessionService redisSessionService) {
+                        UserService userService, PasswordEncoder passwordEncoder) {
                 this.authenticationManagerBuilder = authenticationManagerBuilder;
                 this.securityUtil = securityUtil;
                 this.userService = userService;
                 this.passwordEncoder = passwordEncoder;
-                this.redisSessionService = redisSessionService;
         }
 
         @PostMapping("/auth/login")
@@ -91,14 +87,6 @@ public class AuthController {
 
                 // update user
                 this.userService.updateUserToken(refresh_token, loginDTO.getUsername());
-
-                // Create session in Redis
-                java.util.Map<String, Object> sessionData = new java.util.HashMap<>();
-                sessionData.put("email", currentUserDB.getEmail());
-                sessionData.put("name", currentUserDB.getName());
-                sessionData.put("role", currentUserDB.getRole().getName());
-                sessionData.put("loginTime", java.time.Instant.now().toString());
-                redisSessionService.createSession(currentUserDB.getId(), access_token, sessionData);
 
                 // set cookies
                 ResponseCookie resCookies = ResponseCookie.from("refresh_token", refresh_token)
@@ -149,15 +137,8 @@ public class AuthController {
                         throw new IdInvalidException("User không tồn tại");
                 }
 
-                // Check session from Redis instead of database
-                java.util.Map<String, Object> session = redisSessionService.getSession(currentUser.getId());
-                if (session == null || session.isEmpty()) {
-                        throw new IdInvalidException("Session không tồn tại hoặc đã hết hạn");
-                }
-
-                // Verify token in session matches
-                String sessionToken = (String) session.get("token");
-                if (sessionToken == null || !sessionToken.equals(refresh_token)) {
+                // Check if refresh token matches
+                if (currentUser.getRefreshToken() == null || !currentUser.getRefreshToken().equals(refresh_token)) {
                         throw new IdInvalidException("Refresh token không hợp lệ");
                 }
 
@@ -179,9 +160,6 @@ public class AuthController {
                 // update user token in database
                 this.userService.updateUserToken(new_refresh_token, email);
 
-                // Update session in Redis with new token
-                redisSessionService.updateSession(currentUser.getId(), "token", new_refresh_token);
-
                 // set cookies
                 ResponseCookie resCookies = ResponseCookie.from("refresh_token", new_refresh_token)
                                 .httpOnly(true)
@@ -201,13 +179,6 @@ public class AuthController {
                                 : "";
                 if (email.equals("")) {
                         throw new IdInvalidException("Access Token không hợp lệ");
-                }
-
-                // Get user to delete session
-                User currentUser = this.userService.handleGetUserByUsername(email);
-                if (currentUser != null) {
-                        // Delete session from Redis
-                        redisSessionService.deleteSession(currentUser.getId());
                 }
 
                 this.userService.updateUserToken(null, email);

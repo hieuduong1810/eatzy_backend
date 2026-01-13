@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.FoodDelivery.service.RedisCacheService;
 import com.example.FoodDelivery.service.RedisGeoService;
-import com.example.FoodDelivery.service.RedisSessionService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,15 +26,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class RedisTestController {
 
         private final RedisCacheService redisCacheService;
-        private final RedisSessionService redisSessionService;
         private final RedisGeoService redisGeoService;
 
         public RedisTestController(
                         RedisCacheService redisCacheService,
-                        RedisSessionService redisSessionService,
                         RedisGeoService redisGeoService) {
                 this.redisCacheService = redisCacheService;
-                this.redisSessionService = redisSessionService;
                 this.redisGeoService = redisGeoService;
         }
 
@@ -81,54 +77,6 @@ public class RedisTestController {
         public ResponseEntity<?> deleteCacheValue(@PathVariable String key) {
                 redisCacheService.delete(key);
                 return ResponseEntity.ok(Map.of("message", "Cache deleted", "key", key));
-        }
-
-        // ============ SESSION DEMO ============
-
-        @PostMapping("/session/{userId}")
-        @ApiMessage("Create user session")
-        @Operation(summary = "Create a new user session")
-        public ResponseEntity<?> createSession(
-                        @PathVariable Long userId,
-                        @RequestBody Map<String, Object> sessionData) {
-
-                String token = "token_" + System.currentTimeMillis();
-                redisSessionService.createSession(userId, token, sessionData);
-
-                return ResponseEntity.ok(Map.of(
-                                "message", "Session created",
-                                "userId", userId,
-                                "token", token,
-                                "data", sessionData,
-                                "ttl", "2 hours"));
-        }
-
-        @GetMapping("/session/{userId}")
-        @ApiMessage("Get user session")
-        @Operation(summary = "Get user session data")
-        public ResponseEntity<?> getSession(@PathVariable Long userId) {
-                Map<String, Object> session = redisSessionService.getSession(userId);
-
-                if (session == null) {
-                        return ResponseEntity.ok(Map.of(
-                                        "message", "Session not found or expired",
-                                        "userId", userId));
-                }
-
-                return ResponseEntity.ok(Map.of(
-                                "message", "Session found",
-                                "userId", userId,
-                                "session", session));
-        }
-
-        @DeleteMapping("/session/{userId}")
-        @ApiMessage("Delete user session (logout)")
-        @Operation(summary = "Delete user session")
-        public ResponseEntity<?> deleteSession(@PathVariable Long userId) {
-                redisSessionService.deleteSession(userId);
-                return ResponseEntity.ok(Map.of(
-                                "message", "Session deleted (user logged out)",
-                                "userId", userId));
         }
 
         // ============ GEO LOCATION DEMO ============
