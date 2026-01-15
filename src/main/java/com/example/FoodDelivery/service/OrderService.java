@@ -101,7 +101,7 @@ public class OrderService {
         this.orderEarningsSummaryRepository = orderEarningsSummaryRepository;
     }
 
-    private ResOrderDTO convertToResOrderDTO(Order order) {
+    public ResOrderDTO convertToResOrderDTO(Order order) {
         ResOrderDTO dto = new ResOrderDTO();
         dto.setId(order.getId());
         dto.setOrderStatus(order.getOrderStatus());

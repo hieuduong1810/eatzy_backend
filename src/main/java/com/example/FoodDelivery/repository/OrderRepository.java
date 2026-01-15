@@ -40,4 +40,6 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     List<Order> findByOrderStatusAndCreatedAtBefore(String orderStatus, Instant createdAt);
 
     List<Order> findByOrderStatusAndPreparingAtBefore(String orderStatus, Instant preparingAt);
+
+    List<Order> findByOrderStatusAndDriverIsNullOrderByPreparingAtAsc(String orderStatus);
 }
