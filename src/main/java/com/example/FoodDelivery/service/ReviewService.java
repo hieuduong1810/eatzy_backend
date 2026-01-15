@@ -26,7 +26,10 @@ import com.example.FoodDelivery.util.error.IdInvalidException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
@@ -34,16 +37,19 @@ public class ReviewService {
     private final RestaurantRepository restaurantRepository;
     private final DriverProfileRepository driverProfileRepository;
     private final UserService userService;
+    private final UserScoringService userScoringService;
 
     public ReviewService(ReviewRepository reviewRepository, UserRepository userRepository,
             OrderRepository orderRepository, RestaurantRepository restaurantRepository,
-            DriverProfileRepository driverProfileRepository, UserService userService) {
+            DriverProfileRepository driverProfileRepository, UserService userService,
+            UserScoringService userScoringService) {
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
         this.restaurantRepository = restaurantRepository;
         this.driverProfileRepository = driverProfileRepository;
         this.userService = userService;
+        this.userScoringService = userScoringService;
     }
 
     private ResReviewDTO convertToDTO(Review review) {
@@ -164,6 +170,11 @@ public class ReviewService {
         // update rating based on review target
         if (reviewTarget.equals("restaurant")) {
             updateRestaurantRating(savedReview.getTargetName());
+            
+            // Track user scoring for restaurant rating
+            Restaurant restaurant = review.getOrder().getRestaurant();
+            userScoringService.trackRating(customer, restaurant, review.getRating());
+            log.info("⭐ User {} rated restaurant {} with {} stars", customer.getId(), restaurant.getId(), review.getRating());
         } else if (reviewTarget.equals("driver")) {
             updateDriverRating(savedReview.getTargetName());
         }

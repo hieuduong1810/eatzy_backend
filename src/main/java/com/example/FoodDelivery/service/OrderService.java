@@ -36,6 +36,7 @@ import com.example.FoodDelivery.repository.MenuOptionRepository;
 import com.example.FoodDelivery.repository.OrderEarningsSummaryRepository;
 import com.example.FoodDelivery.repository.OrderRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
+import com.example.FoodDelivery.service.UserScoringService;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -68,6 +69,7 @@ public class OrderService {
     private final RedisGeoService redisGeoService;
     private final RedisRejectionService redisRejectionService;
     private final OrderEarningsSummaryRepository orderEarningsSummaryRepository;
+    private final UserScoringService userScoringService;
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, VoucherService voucherService, DishService dishService,
@@ -81,7 +83,8 @@ public class OrderService {
             @Lazy DriverProfileService driverProfileService,
             RedisGeoService redisGeoService,
             RedisRejectionService redisRejectionService,
-            OrderEarningsSummaryRepository orderEarningsSummaryRepository) {
+            OrderEarningsSummaryRepository orderEarningsSummaryRepository,
+            @Lazy UserScoringService userScoringService) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
@@ -99,6 +102,7 @@ public class OrderService {
         this.redisGeoService = redisGeoService;
         this.redisRejectionService = redisRejectionService;
         this.orderEarningsSummaryRepository = orderEarningsSummaryRepository;
+        this.userScoringService = userScoringService;
     }
 
     public ResOrderDTO convertToResOrderDTO(Order order) {
@@ -653,6 +657,9 @@ public class OrderService {
 
         // Notify restaurant about new order via WebSocket
         webSocketService.notifyRestaurantNewOrder(restaurant.getId(), orderDTO);
+
+        // Track user scoring for placing order
+        userScoringService.trackPlaceOrder(customer, restaurant);
 
         // Process payment based on payment method
         if ("WALLET".equals(savedOrder.getPaymentMethod())) {

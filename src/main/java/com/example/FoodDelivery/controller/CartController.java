@@ -6,10 +6,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Cart;
+import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.req.ReqCartDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.cart.ResCartDTO;
 import com.example.FoodDelivery.service.CartService;
+import com.example.FoodDelivery.service.UserService;
+import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -32,9 +35,11 @@ import java.util.List;
 @RequestMapping("/api/v1")
 public class CartController {
     private final CartService cartService;
+    private final UserService userService;
 
-    public CartController(CartService cartService) {
+    public CartController(CartService cartService, UserService userService) {
         this.cartService = cartService;
+        this.userService = userService;
     }
 
     @PutMapping("/carts")
@@ -66,6 +71,25 @@ public class CartController {
     @ApiMessage("Get carts by customer id")
     public ResponseEntity<List<ResCartDTO>> getCartsByCustomerId(@PathVariable("customerId") Long customerId) {
         List<ResCartDTO> carts = cartService.getCartsDTOByCustomerId(customerId);
+        return ResponseEntity.ok(carts);
+    }
+
+    @GetMapping("/carts/my-carts")
+    @ApiMessage("Get current user's carts")
+    public ResponseEntity<List<ResCartDTO>> getMyCart() throws IdInvalidException {
+        String email = SecurityUtil.getCurrentUserLogin().isPresent() 
+                ? SecurityUtil.getCurrentUserLogin().get() : "";
+        
+        if (email.isEmpty()) {
+            throw new IdInvalidException("User not authenticated");
+        }
+        
+        User currentUser = this.userService.handleGetUserByUsername(email);
+        if (currentUser == null) {
+            throw new IdInvalidException("User not found");
+        }
+        
+        List<ResCartDTO> carts = cartService.getCartsDTOByCustomerId(currentUser.getId());
         return ResponseEntity.ok(carts);
     }
 

@@ -16,13 +16,16 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMagazineDTO;
-import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO;
+import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO; 
 import com.example.FoodDelivery.repository.RestaurantRepository;
 import com.example.FoodDelivery.repository.RestaurantTypeRepository;
+import com.example.FoodDelivery.repository.UserRestaurantScoreRepository;
+import com.example.FoodDelivery.repository.UserTypeScoreRepository;
 import com.example.FoodDelivery.util.SlugUtils;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,18 +41,27 @@ public class RestaurantService {
     private final MapboxService mapboxService;
     private final SystemConfigurationService systemConfigurationService;
     private final RedisCacheService redisCacheService;
+    private final UserTypeScoreRepository userTypeScoreRepository;
+    private final UserRestaurantScoreRepository userRestaurantScoreRepository;
+    private final UserScoringService userScoringService;
 
     public RestaurantService(RestaurantRepository restaurantRepository, UserService userService,
             RestaurantTypeRepository restaurantTypeRepository,
             MapboxService mapboxService,
             SystemConfigurationService systemConfigurationService,
-            RedisCacheService redisCacheService) {
+            RedisCacheService redisCacheService,
+            UserTypeScoreRepository userTypeScoreRepository,
+            UserRestaurantScoreRepository userRestaurantScoreRepository,
+            @org.springframework.context.annotation.Lazy UserScoringService userScoringService) {
         this.restaurantRepository = restaurantRepository;
         this.userService = userService;
         this.restaurantTypeRepository = restaurantTypeRepository;
         this.mapboxService = mapboxService;
         this.systemConfigurationService = systemConfigurationService;
         this.redisCacheService = redisCacheService;
+        this.userTypeScoreRepository = userTypeScoreRepository;
+        this.userRestaurantScoreRepository = userRestaurantScoreRepository;
+        this.userScoringService = userScoringService;
     }
 
     public boolean existsByName(String name) {
@@ -234,6 +246,27 @@ public class RestaurantService {
         if (restaurant == null) {
             return null;
         }
+        return convertToResRestaurantDTO(restaurant);
+    }
+
+    /**
+     * Get restaurant DTO by ID with user tracking for recommendations
+     * @param id Restaurant ID
+     * @param user Current user (can be null for anonymous access)
+     * @return Restaurant DTO
+     */
+    public ResRestaurantDTO getRestaurantDTOByIdWithTracking(Long id, User user) {
+        Restaurant restaurant = getRestaurantById(id);
+        if (restaurant == null) {
+            return null;
+        }
+        
+        // Track user view for scoring (only if user is logged in)
+        if (user != null && userScoringService != null) {
+            userScoringService.trackViewRestaurantDetails(user, restaurant);
+            log.info("👁️ User {} viewed restaurant {}: tracking for recommendations", user.getId(), restaurant.getId());
+        }
+        
         return convertToResRestaurantDTO(restaurant);
     }
 
@@ -430,7 +463,7 @@ public class RestaurantService {
     /**
      * Get restaurants within maximum distance from user location
      * Uses Mapbox API to calculate real driving distance
-     * Supports filtering and pagination
+     * Supports personalized ranking if user is logged in
      * WITH REDIS CACHE for search results
      * 
      * @param latitude      User's latitude
@@ -439,13 +472,28 @@ public class RestaurantService {
      *                      category name
      * @param spec          Specification for additional filtering
      * @param pageable      Pagination information
-     * @return Paginated list of nearby restaurants with distance
+     * @return Paginated list of nearby restaurants with distance and optional ranking scores
      */
     public ResultPaginationDTO getNearbyRestaurants(BigDecimal latitude, BigDecimal longitude,
             String searchKeyword, Specification<Restaurant> spec, Pageable pageable) {
 
-        // 1. Build cache key
-        String cacheKey = buildCacheKey(latitude, longitude, searchKeyword, pageable);
+        // Get current user if logged in (for personalized ranking)
+        User currentUser = null;
+        try {
+            String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin().orElse(null);
+            if (email != null && !email.isEmpty()) {
+                currentUser = this.userService.handleGetUserByUsername(email);
+                if (currentUser != null) {
+                    log.info("🔐 User {} logged in - enabling personalized ranking", currentUser.getId());
+                }
+            }
+        } catch (Exception e) {
+            log.debug("No authenticated user - using default ranking");
+        }
+
+        // 1. Build cache key (include userId for personalized cache)
+        String cacheKey = buildCacheKey(latitude, longitude, searchKeyword, pageable, 
+                                       currentUser != null ? currentUser.getId() : null);
 
         // 2. Check cache first
         Object cachedResult = redisCacheService.get(cacheKey);
@@ -460,7 +508,7 @@ public class RestaurantService {
         // Get max distance from configuration (default 10 km)
         BigDecimal maxDistanceKm = new BigDecimal("10.0");
         try {
-            SystemConfiguration config = systemConfigurationService
+            com.example.FoodDelivery.domain.SystemConfiguration config = systemConfigurationService
                     .getSystemConfigurationByKey("MAX_RESTAURANT_DISTANCE_KM");
             if (config != null && config.getConfigValue() != null && !config.getConfigValue().isEmpty()) {
                 maxDistanceKm = new BigDecimal(config.getConfigValue());
@@ -520,11 +568,21 @@ public class RestaurantService {
             filteredRestaurants = restaurantRepository.findAll();
         }
 
-        log.info("Checking {} restaurants within {} km from location ({}, {})",
+        // Filter only ACTIVE or OPEN restaurants
+        filteredRestaurants = filteredRestaurants.stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus()) || "OPEN".equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        log.info("Checking {} ACTIVE/OPEN restaurants within {} km from location ({}, {})",
                 filteredRestaurants.size(), maxDistanceKm, latitude, longitude);
 
-        // Calculate distances and filter by max distance
+        // Calculate distances and scores
         List<ResRestaurantMagazineDTO> nearbyRestaurants = new ArrayList<>();
+        final User finalCurrentUser = currentUser;
+        
+        // Track search scoring only once per search (not per restaurant)
+        boolean hasTrackedSearchScoring = false;
+        
         for (Restaurant restaurant : filteredRestaurants) {
             // Skip restaurants without location data
             if (restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
@@ -548,16 +606,56 @@ public class RestaurantService {
             if (distance.compareTo(maxDistanceKm) <= 0) {
                 ResRestaurantMagazineDTO dto = convertToResRestaurantMagazineDTO(restaurant);
                 dto.setDistance(distance);
+
+                // Track user search scoring only once per search
+                if (!hasTrackedSearchScoring && finalCurrentUser != null && searchKeyword != null && !searchKeyword.trim().isEmpty()) {
+                    boolean tracked = trackSearchScoring(finalCurrentUser, restaurant, searchKeyword);
+                    if (tracked) {
+                        hasTrackedSearchScoring = true;
+                    }
+                }
+
+                // Calculate personalized scores if user is logged in
+                if (finalCurrentUser != null) {
+                    try {
+                        double typeScore = calculateTypeScore(finalCurrentUser.getId(), restaurant);
+                        double loyaltyScore = calculateLoyaltyScore(finalCurrentUser.getId(), restaurant);
+                        double distanceScore = calculateDistanceScore(distance);
+                        double qualityScore = calculateQualityScore(restaurant);
+                        double finalScore = (typeScore * 0.40) + (loyaltyScore * 0.30) + 
+                                          (distanceScore * 0.20) + (qualityScore * 0.10);
+
+                        dto.setTypeScore(typeScore);
+                        dto.setLoyaltyScore(loyaltyScore);
+                        dto.setDistanceScore(distanceScore);
+                        dto.setQualityScore(qualityScore);
+                        dto.setFinalScore(finalScore);
+
+                        log.debug("🎯 Restaurant {}: Type={}, Loyalty={}, Distance={}, Quality={}, Final={}",
+                                restaurant.getName(), typeScore, loyaltyScore, distanceScore, qualityScore, finalScore);
+                    } catch (Exception e) {
+                        log.error("Error calculating scores for restaurant {}: {}", restaurant.getId(), e.getMessage());
+                    }
+                }
+
                 nearbyRestaurants.add(dto);
                 log.debug("Restaurant {} is {} km away (within {} km limit)",
                         restaurant.getName(), distance, maxDistanceKm);
             }
         }
 
-        // Sort by distance (closest first)
-        nearbyRestaurants.sort(Comparator.comparing(ResRestaurantMagazineDTO::getDistance));
-
-        log.info("Found {} restaurants within {} km", nearbyRestaurants.size(), maxDistanceKm);
+        // Sort restaurants
+        if (finalCurrentUser != null && !nearbyRestaurants.isEmpty() 
+            && nearbyRestaurants.get(0).getFinalScore() != null) {
+            // Sort by personalized final score (highest first)
+            nearbyRestaurants.sort(Comparator.comparing(ResRestaurantMagazineDTO::getFinalScore).reversed());
+            log.info("📊 Sorted {} restaurants by personalized ranking for user {}", 
+                    nearbyRestaurants.size(), finalCurrentUser.getId());
+        } else {
+            // Sort by distance (closest first) - default for non-logged-in users
+            nearbyRestaurants.sort(Comparator.comparing(ResRestaurantMagazineDTO::getDistance));
+            log.info("📍 Sorted {} restaurants by distance (no personalization)", nearbyRestaurants.size());
+        }
 
         // Apply pagination
         int start = (int) pageable.getOffset();
@@ -584,15 +682,17 @@ public class RestaurantService {
     }
 
     /**
-     * Build cache key for search results
+     * Build cache key for search results (including userId for personalized cache)
      */
     private String buildCacheKey(BigDecimal latitude, BigDecimal longitude,
-            String searchKeyword, Pageable pageable) {
+            String searchKeyword, Pageable pageable, Long userId) {
         String keyword = searchKeyword != null ? searchKeyword.trim() : "all";
-        return String.format("search:nearby:%s:%s:%s:page:%d:size:%d",
+        String userKey = userId != null ? "user:" + userId : "guest";
+        return String.format("search:nearby:%s:%s:%s:%s:page:%d:size:%d",
                 latitude.toPlainString(),
                 longitude.toPlainString(),
                 keyword,
+                userKey,
                 pageable.getPageNumber(),
                 pageable.getPageSize());
     }
@@ -603,5 +703,113 @@ public class RestaurantService {
     public void clearSearchCache() {
         redisCacheService.deletePattern("search:nearby:*");
         log.info("🗑️  Cleared all search cache");
+    }
+
+    /**
+     * Calculate S_Type: User's preference score for restaurant types (scaled to 100)
+     * Formula: S_Type(100) = Min(100, (RawScore / 200) × 100)
+     * Threshold: 200 points (e.g., ~40 orders of same food type)
+     */
+    private double calculateTypeScore(Long userId, Restaurant restaurant) {
+        if (restaurant.getRestaurantTypes() == null || restaurant.getRestaurantTypes().isEmpty()) {
+            return 0.0;
+        }
+
+        List<Long> typeIds = restaurant.getRestaurantTypes().stream()
+                .map(RestaurantType::getId)
+                .collect(Collectors.toList());
+
+        Integer rawScore = userTypeScoreRepository.getTotalTypeScoreForUser(userId, typeIds);
+        if (rawScore == null || rawScore <= 0) {
+            return 0.0;
+        }
+        
+        // Scale to 100: Min(100, (RawScore / 200) × 100)
+        double scaledScore = (rawScore / 200.0) * 100.0;
+        return Math.min(100.0, scaledScore);
+    }
+
+    /**
+     * Calculate S_Quen: User's loyalty/familiarity score with restaurant (scaled to 100)
+     * Formula: S_Quen(100) = Min(100, (RawScore / 50) × 100)
+     * Threshold: 50 points (~5 orders at same restaurant = "loyal customer")
+     */
+    private double calculateLoyaltyScore(Long userId, Restaurant restaurant) {
+        Integer rawScore = userRestaurantScoreRepository.getScoreOrDefault(userId, restaurant.getId());
+        if (rawScore == null || rawScore <= 0) {
+            return 0.0;
+        }
+        
+        // Scale to 100: Min(100, (RawScore / 50) × 100)
+        double scaledScore = (rawScore / 50.0) * 100.0;
+        return Math.min(100.0, scaledScore);
+    }
+
+    /**
+     * Calculate S_Gần: Distance score (100 at 0km, decrease 10 points per km)
+     * Formula: Max(0, 100 - (distance × 10))
+     */
+    private double calculateDistanceScore(BigDecimal distanceKm) {
+        double distance = distanceKm.doubleValue();
+        double score = 100.0 - (distance * 10.0);
+        return Math.max(0.0, score);
+    }
+
+    /**
+     * Calculate S_Ngon: Quality score based on restaurant rating
+     * Formula: rating × 20 (to scale to 100)
+     */
+    private double calculateQualityScore(Restaurant restaurant) {
+        if (restaurant.getAverageRating() == null) {
+            return 0.0;
+        }
+        return restaurant.getAverageRating().doubleValue() * 20.0;
+    }
+
+    /**
+     * Track user search scoring based on how the restaurant matched the search keyword
+     * - If keyword matches restaurant name: +2 restaurant score, +2 type score
+     * - If keyword matches restaurant type: 0 restaurant score, +2 type score
+     * 
+     * @param user Current logged-in user
+     * @param restaurant Restaurant found in search results
+     * @param searchKeyword The keyword user used to search
+     * @return true if scoring was applied, false otherwise
+     */
+    private boolean trackSearchScoring(User user, Restaurant restaurant, String searchKeyword) {
+        if (user == null || restaurant == null || userScoringService == null) {
+            return false;
+        }
+        
+        String keyword = searchKeyword.trim().toLowerCase();
+        
+        // Check if search keyword exactly matches restaurant name (case-insensitive)
+        boolean matchedByRestaurantName = restaurant.getName() != null && 
+                restaurant.getName().toLowerCase().equals(keyword);
+        
+        // Check if search keyword exactly matches any restaurant type name
+        boolean matchedByRestaurantType = false;
+        if (restaurant.getRestaurantTypes() != null) {
+            matchedByRestaurantType = restaurant.getRestaurantTypes().stream()
+                    .anyMatch(type -> type.getName() != null && 
+                            type.getName().toLowerCase().equals(keyword));
+        }
+        
+        // Apply scoring based on what matched
+        if (matchedByRestaurantName) {
+            // User searched by restaurant name: +2 restaurant, +2 type
+            userScoringService.trackSearchRestaurantByNameAndClick(user, restaurant);
+            log.info("🔍 User {} searched '{}' - matched restaurant name '{}': +2 restaurant, +2 type", 
+                    user.getId(), searchKeyword, restaurant.getName());
+            return true;
+        } else if (matchedByRestaurantType) {
+            // User searched by restaurant type: 0 restaurant, +2 type
+            userScoringService.trackSearchDishAndClick(user, restaurant);
+            log.info("🍜 User {} searched '{}' - matched restaurant type in '{}': +2 type (once per search)", 
+                    user.getId(), searchKeyword, restaurant.getName());
+            return true;
+        }
+        
+        return false;
     }
 }

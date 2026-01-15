@@ -7,9 +7,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Restaurant;
+import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.service.RestaurantService;
+import com.example.FoodDelivery.service.UserService;
+import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -31,9 +34,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 @RequestMapping("/api/v1")
 public class RestaurantController {
     private final RestaurantService restaurantService;
+    private final UserService userService;
 
-    public RestaurantController(RestaurantService restaurantService) {
+    public RestaurantController(RestaurantService restaurantService, UserService userService) {
         this.restaurantService = restaurantService;
+        this.userService = userService;
     }
 
     @PostMapping("/restaurants")
@@ -83,7 +88,22 @@ public class RestaurantController {
     @GetMapping("/restaurants/{id}")
     @ApiMessage("Get restaurant by id")
     public ResponseEntity<ResRestaurantDTO> getRestaurantById(@PathVariable("id") Long id) throws IdInvalidException {
-        ResRestaurantDTO restaurant = restaurantService.getRestaurantDTOById(id);
+        // Get current user if logged in (for tracking)
+        User currentUser = null;
+        try {
+            String email = SecurityUtil.getCurrentUserLogin().orElse(null);
+            if (email != null) {
+                currentUser = userService.handleGetUserByUsername(email);
+            }
+        } catch (Exception e) {
+            // Ignore - user is not logged in
+        }
+        
+        // Use tracking method if user is logged in, otherwise use regular method
+        ResRestaurantDTO restaurant = currentUser != null 
+            ? restaurantService.getRestaurantDTOByIdWithTracking(id, currentUser)
+            : restaurantService.getRestaurantDTOById(id);
+            
         if (restaurant == null) {
             throw new IdInvalidException("Restaurant not found with id: " + id);
         }

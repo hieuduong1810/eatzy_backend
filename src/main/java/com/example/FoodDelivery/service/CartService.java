@@ -24,24 +24,30 @@ import com.example.FoodDelivery.domain.res.cart.ResCartItemDTO;
 import com.example.FoodDelivery.domain.res.cart.ResCartItemOptionDTO;
 import com.example.FoodDelivery.repository.CartRepository;
 import com.example.FoodDelivery.repository.MenuOptionRepository;
+import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class CartService {
     private final CartRepository cartRepository;
     private final UserService userService;
     private final RestaurantService restaurantService;
     private final DishService dishService;
     private final MenuOptionRepository menuOptionRepository;
+    private final UserScoringService userScoringService;
 
     public CartService(CartRepository cartRepository, UserService userService,
             RestaurantService restaurantService, DishService dishService,
-            MenuOptionRepository menuOptionRepository) {
+            MenuOptionRepository menuOptionRepository, UserScoringService userScoringService) {
         this.cartRepository = cartRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
         this.dishService = dishService;
         this.menuOptionRepository = menuOptionRepository;
+        this.userScoringService = userScoringService;
     }
 
     private ResCartDTO convertToResCartDTO(Cart cart) {
@@ -267,13 +273,17 @@ public class CartService {
 
     @Transactional
     public ResCartDTO saveOrUpdateCart(ReqCartDTO reqCartDTO) throws IdInvalidException {
-        // Validate customer
-        if (reqCartDTO.getCustomer() == null || reqCartDTO.getCustomer().getId() == null) {
-            throw new IdInvalidException("Customer is required");
+        // Get current user from security context
+        String email = SecurityUtil.getCurrentUserLogin().isPresent() 
+                ? SecurityUtil.getCurrentUserLogin().get() : "";
+        
+        if (email.isEmpty()) {
+            throw new IdInvalidException("User not authenticated");
         }
-        User customer = this.userService.getUserById(reqCartDTO.getCustomer().getId());
+        
+        User customer = this.userService.handleGetUserByUsername(email);
         if (customer == null) {
-            throw new IdInvalidException("Customer not found with id: " + reqCartDTO.getCustomer().getId());
+            throw new IdInvalidException("Customer not found with email: " + email);
         }
 
         // Validate restaurant
@@ -344,6 +354,11 @@ public class CartService {
 
             // Save cart with items
             Cart savedCart = cartRepository.save(cart);
+
+            // Track user scoring for adding to cart
+            userScoringService.trackAddToCart(customer, restaurant);
+            log.info("🛒 User {} added items to cart from restaurant {}", customer.getId(), restaurant.getId());
+
             return convertToResCartDTO(savedCart);
         } else {
             // If cart items are empty after update, delete the cart
