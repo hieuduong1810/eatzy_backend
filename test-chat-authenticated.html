@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chat Test with Authentication</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Login Section */
+        .login-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .login-section.hidden {
+            display: none;
+        }
+
+        .login-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .form-group input {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .user-info {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .user-info strong {
+            color: #667eea;
+        }
+
+        /* Chat Section */
+        .chat-section {
+            display: none;
+        }
+
+        .chat-section.active {
+            display: block;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .chat-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .chat-box {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 20px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .driver-header {
+            background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%);
+        }
+
+        .status {
+            padding: 12px 20px;
+            background: #f9f9f9;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 13px;
+        }
+
+        .connected {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+
+        .disconnected {
+            color: #f44336;
+            font-weight: 600;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+
+        .messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .message {
+            margin: 15px 0;
+            padding: 12px 15px;
+            border-radius: 12px;
+            max-width: 75%;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .sent {
+            background: linear-gradient(135deg, #DCF8C6 0%, #c5e8b7 100%);
+            margin-left: auto;
+            text-align: right;
+            border-bottom-right-radius: 4px;
+        }
+
+        .received {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .message .time {
+            font-size: 10px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .typing-indicator {
+            font-style: italic;
+            color: #666;
+            font-size: 12px;
+            padding: 8px 20px;
+            background: #f0f0f0;
+            display: none;
+        }
+
+        .typing-indicator.show {
+            display: block;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 2px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            background: white;
+            border-radius: 0 0 15px 15px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="email"],
+        input[type="number"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .history-section {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            margin-top: 20px;
+        }
+
+        .history-messages {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔒 Chat Test with Authentication</h1>
+
+        <!-- Login Section -->
+        <div class="login-section" id="loginSection">
+            <h2 style="margin-bottom: 20px; color: #333;">🔑 Login</h2>
+            <div class="login-form">
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="loginEmail" value="customer1@test.com" />
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="loginPassword" value="123456" />
+                </div>
+                <div class="btn-group">
+                    <button onclick="login()" class="success">Login</button>
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 13px;">
+                <strong>Test accounts:</strong><br>
+                Customer: customer1@test.com / 123456<br>
+                Driver: driver1@test.com / 123456
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section" id="chatSection">
+            <div class="user-info" id="userInfo"></div>
+
+            <div class="controls">
+                <div class="form-group">
+                    <label>Order ID:</label>
+                    <input type="number" id="orderId" value="1" />
+                </div>
+                <div class="btn-group">
+                    <button onclick="connectToChat()" class="success" id="connectBtn">Connect to Chat</button>
+                    <button onclick="disconnect()" class="danger" id="disconnectBtn" disabled>Disconnect</button>
+                    <button onclick="logout()" class="danger">Logout</button>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <!-- User Chat Box -->
+                <div class="chat-box">
+                    <div class="header" id="userHeader">💬 My Chat</div>
+                    <div class="status">
+                        Status: <span id="chatStatus" class="disconnected">Disconnected</span>
+                    </div>
+                    <div id="chatMessages" class="messages"></div>
+                    <div id="typingIndicator" class="typing-indicator">Other user is typing...</div>
+                    <div class="input-area">
+                        <input type="text" id="messageInput" placeholder="Type a message..."
+                            onkeypress="handleKeyPress(event)" onkeyup="handleTyping()" disabled />
+                        <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div class="chat-box">
+                    <div class="header">📜 Message History (from API)</div>
+                    <div class="status">
+                        Total messages: <span id="messageCount">0</span>
+                    </div>
+                    <div class="history-messages" id="historyMessages">
+                        <p style="text-align: center; color: #999;">Connect to chat to load history</p>
+                    </div>
+                    <div class="input-area">
+                        <button onclick="loadHistory()" id="loadHistoryBtn" disabled class="success">Load
+                            History</button>
+                        <button onclick="refreshHistory()" class="success">🔄 Refresh</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let currentUser = null;
+        let accessToken = null;
+        let typingTimeout = null;
+
+        // API Base URL
+        const API_URL = 'http://localhost:8080/api/v1';
+
+        // Login
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                alert('Please enter email and password');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: email, password })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Login failed');
+                }
+
+                const data = await response.json();
+                accessToken = data.data.access_token;
+                currentUser = data.data.user;
+
+                console.log('Login successful:', currentUser);
+
+                // Show chat section
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('chatSection').classList.add('active');
+
+                // Display user info
+                const userRole = currentUser.role?.name || 'USER';
+                document.getElementById('userInfo').innerHTML = `
+                    <strong>Logged in as:</strong> ${currentUser.name} (${currentUser.email})<br>
+                    <strong>Role:</strong> ${userRole} | <strong>User ID:</strong> ${currentUser.id}
+                `;
+
+                // Update header
+                document.getElementById('userHeader').textContent = `💬 ${currentUser.name}'s Chat`;
+
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed. Please check your credentials.');
+            }
+        }
+
+        // Logout
+        function logout() {
+            disconnect();
+            accessToken = null;
+            currentUser = null;
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('chatSection').classList.remove('active');
+            document.getElementById('chatMessages').innerHTML = '';
+            document.getElementById('historyMessages').innerHTML = '<p style="text-align: center; color: #999;">Connect to chat to load history</p>';
+        }
+
+        // Connect to WebSocket
+        function connectToChat() {
+            if (!accessToken || !currentUser) {
+                alert('Please login first');
+                return;
+            }
+
+            const orderId = document.getElementById('orderId').value;
+            if (!orderId) {
+                alert('Please enter Order ID');
+                return;
+            }
+
+            const socket = new SockJS(`${API_URL.replace('/api/v1', '')}/ws`);
+            stompClient = Stomp.over(socket);
+
+            // Connect with authentication header
+            const connectHeaders = {
+                'Authorization': `Bearer ${accessToken}`
+            };
+
+            stompClient.connect(connectHeaders, function (frame) {
+                console.log('Connected to WebSocket:', frame);
+                document.getElementById('chatStatus').textContent = 'Connected';
+                document.getElementById('chatStatus').className = 'connected';
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('loadHistoryBtn').disabled = false;
+
+                // Subscribe to chat messages
+                stompClient.subscribe(`/topic/chat/order/${orderId}`, function (message) {
+                    console.log('Received message:', message.body);
+                    const chatMsg = JSON.parse(message.body);
+                    displayMessage(chatMsg);
+                });
+
+                // Subscribe to typing indicator
+                stompClient.subscribe(`/topic/chat/order/${orderId}/typing`, function (message) {
+                    const typingMsg = JSON.parse(message.body);
+                    if (typingMsg.senderId != currentUser.id) {
+                        showTypingIndicator();
+                    }
+                });
+
+                // Load message history
+                loadHistory();
+            }, function (error) {
+                console.error('WebSocket connection error:', error);
+                alert('Failed to connect to chat. Please try again.');
+            });
+        }
+
+        // Disconnect
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+                stompClient = null;
+            }
+            document.getElementById('chatStatus').textContent = 'Disconnected';
+            document.getElementById('chatStatus').className = 'disconnected';
+            document.getElementById('messageInput').disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('loadHistoryBtn').disabled = true;
+        }
+
+        // Send message
+        function sendMessage() {
+            const orderId = document.getElementById('orderId').value;
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+
+            if (!message || !stompClient) return;
+
+            const chatMessage = {
+                orderId: parseInt(orderId),
+                senderId: currentUser.id,
+                senderName: currentUser.name,
+                senderType: getSenderType(),
+                message: message,
+                messageType: "TEXT"
+            };
+
+            stompClient.send(`/app/chat/${orderId}`, {}, JSON.stringify(chatMessage));
+            input.value = '';
+        }
+
+        // Handle typing
+        function handleTyping() {
+            if (!stompClient) return;
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                const orderId = document.getElementById('orderId').value;
+
+                const typingMsg = {
+                    senderId: currentUser.id,
+                    senderName: currentUser.name,
+                    senderType: getSenderType(),
+                    messageType: "TYPING"
+                };
+
+                stompClient.send(`/app/typing/${orderId}`, {}, JSON.stringify(typingMsg));
+            }, 500);
+        }
+
+        // Handle Enter key
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Display message
+        function displayMessage(chatMsg) {
+            const messagesDiv = document.getElementById('chatMessages');
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (chatMsg.senderId == currentUser.id ? 'sent' : 'received');
+
+            const timestamp = chatMsg.timestamp || new Date().toISOString();
+            const time = new Date(timestamp).toLocaleTimeString();
+
+            messageDiv.innerHTML = `
+                <strong>${chatMsg.senderName} (${chatMsg.senderType})</strong><br>
+                ${chatMsg.message}
+                <div class="time">${time}</div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Update count
+            updateMessageCount();
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const typingDiv = document.getElementById('typingIndicator');
+            typingDiv.classList.add('show');
+
+            setTimeout(() => {
+                typingDiv.classList.remove('show');
+            }, 3000);
+        }
+
+        // Get sender type based on user role
+        function getSenderType() {
+            const role = currentUser.role?.name || '';
+            if (role.includes('DRIVER')) return 'DRIVER';
+            if (role.includes('CUSTOMER')) return 'CUSTOMER';
+            return 'USER';
+        }
+
+        // Load message history from API
+        async function loadHistory() {
+            if (!accessToken) return;
+
+            const orderId = document.getElementById('orderId').value;
+
+            try {
+                const response = await fetch(`${API_URL}/chat/order/${orderId}?page=0&size=50`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load history');
+                }
+
+                const data = await response.json();
+                const messages = data.data || [];
+
+                const historyDiv = document.getElementById('historyMessages');
+                historyDiv.innerHTML = '';
+
+                if (messages.length === 0) {
+                    historyDiv.innerHTML = '<p style="text-align: center; color: #999;">No messages yet</p>';
+                    return;
+                }
+
+                messages.reverse().forEach(msg => {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'message ' + (msg.senderId == currentUser.id ? 'sent' : 'received');
+                    msgDiv.style.maxWidth = '100%';
+                    msgDiv.style.marginBottom = '10px';
+
+                    const time = new Date(msg.timestamp).toLocaleTimeString();
+
+                    msgDiv.innerHTML = `
+                        <strong>${msg.senderName} (${msg.senderType})</strong><br>
+                        ${msg.message}
+                        <div class="time">${time}</div>
+                    `;
+
+                    historyDiv.appendChild(msgDiv);
+                });
+
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+
+                // Update count
+                updateMessageCount();
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+
+        // Refresh history
+        function refreshHistory() {
+            loadHistory();
+        }
+
+        // Update message count
+        async function updateMessageCount() {
+            if (!accessToken) return;
+
+            const orderId = document.getElementById('orderId').value;
+
+            try {
+                const response = await fetch(`${API_URL}/chat/order/${orderId}/count`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('messageCount').textContent = data.data || 0;
+                }
+            } catch (error) {
+                console.error('Failed to update count:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
