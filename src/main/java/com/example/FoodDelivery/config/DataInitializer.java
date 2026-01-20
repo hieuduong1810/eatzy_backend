@@ -167,16 +167,82 @@ public class DataInitializer implements CommandLineRunner {
                 customerUser = userRepository.save(customerUser);
                 log.info("✅ Customer user created");
 
+                // ============ ADD 7 MORE CUSTOMERS ============
+                List<User> additionalCustomers = new ArrayList<>();
+                for (int i = 2; i <= 8; i++) {
+                        User customer = new User();
+                        customer.setName("customer" + i);
+                        customer.setEmail("customer" + i + "@gmail.com");
+                        customer.setPassword(passwordEncoder.encode("123456"));
+                        customer.setGender(i % 2 == 0 ? GenderEnum.FEMALE : GenderEnum.MALE);
+                        customer.setAddress("tp hcm");
+                        customer.setAge(20 + i);
+                        customer.setIsActive(true);
+                        customer.setRole(adminRole);
+                        customer = userRepository.save(customer);
+                        additionalCustomers.add(customer);
+                }
+                log.info("✅ 7 additional customers created (customer2 - customer8)");
+
+                // ============ ADD 7 MORE RESTAURANT OWNERS ============
+                List<User> additionalOwners = new ArrayList<>();
+                for (int i = 2; i <= 8; i++) {
+                        User owner = new User();
+                        owner.setName("restaurant" + i);
+                        owner.setEmail("restaurant" + i + "@gmail.com");
+                        owner.setPassword(passwordEncoder.encode("123456"));
+                        owner.setGender(i % 2 == 0 ? GenderEnum.MALE : GenderEnum.FEMALE);
+                        owner.setAddress("tp hcm");
+                        owner.setAge(25 + i);
+                        owner.setIsActive(true);
+                        owner.setRole(adminRole);
+                        owner = userRepository.save(owner);
+                        additionalOwners.add(owner);
+                }
+                log.info("✅ 7 additional restaurant owners created (restaurant2 - restaurant8)");
+
+                // ============ ADD 7 MORE DRIVERS ============
+                List<User> additionalDrivers = new ArrayList<>();
+                for (int i = 2; i <= 8; i++) {
+                        User driver = new User();
+                        driver.setName("driver" + i);
+                        driver.setEmail("driver" + i + "@gmail.com");
+                        driver.setPassword(passwordEncoder.encode("123456"));
+                        driver.setGender(GenderEnum.MALE);
+                        driver.setAddress("tp hcm");
+                        driver.setAge(25 + i);
+                        driver.setIsActive(true);
+                        driver.setRole(adminRole);
+                        driver = userRepository.save(driver);
+                        additionalDrivers.add(driver);
+                }
+                log.info("✅ 7 additional drivers created (driver2 - driver8)");
+
                 // 3. Create wallets for all users with initial balance
                 log.info("Creating wallets...");
                 createWalletWithBalance(adminUser, new BigDecimal("10000000")); // 10 million VND
                 createWalletWithBalance(restaurantUser, new BigDecimal("5000000")); // 5 million VND
                 createWalletWithBalance(driverUser, new BigDecimal("3000000")); // 3 million VND
                 createWalletWithBalance(customerUser, new BigDecimal("2000000")); // 2 million VND
+
+                // Wallets for additional customers
+                for (User customer : additionalCustomers) {
+                        createWalletWithBalance(customer, new BigDecimal("1000000")); // 1 million VND each
+                }
+
+                // Wallets for additional owners
+                for (User owner : additionalOwners) {
+                        createWalletWithBalance(owner, new BigDecimal("5000000")); // 5 million VND each
+                }
+
+                // Wallets for additional drivers
+                for (User driver : additionalDrivers) {
+                        createWalletWithBalance(driver, new BigDecimal("3000000")); // 3 million VND each
+                }
                 log.info("✅ All wallets created with initial balance");
 
-                // 4. Create driver profile
-                log.info("Creating driver profile...");
+                // 4. Create driver profile for original driver
+                log.info("Creating driver profiles...");
                 DriverProfile driverProfile = DriverProfile.builder()
                                 .user(driverUser)
                                 .vehicleDetails("Yamaha Sirius 110cc")
@@ -222,7 +288,59 @@ public class DataInitializer implements CommandLineRunner {
                                 .criminalRecordStatus(StatusEnum.APPROVED)
                                 .build();
                 driverProfileRepository.save(driverProfile);
-                log.info("✅ Driver profile created");
+
+                // Create driver profiles for additional drivers
+                String[] vehicleBrands = { "Honda", "Yamaha", "Suzuki", "SYM", "Piaggio", "Vespa", "Kymco" };
+                String[] vehicleModels = { "Wave Alpha", "Exciter", "Raider", "Angel", "Liberty", "Sprint", "Like" };
+                BigDecimal[] baseLats = {
+                                new BigDecimal("10.770"), new BigDecimal("10.780"), new BigDecimal("10.790"),
+                                new BigDecimal("10.760"), new BigDecimal("10.750"), new BigDecimal("10.800"),
+                                new BigDecimal("10.755")
+                };
+                BigDecimal[] baseLngs = {
+                                new BigDecimal("106.670"), new BigDecimal("106.680"), new BigDecimal("106.690"),
+                                new BigDecimal("106.660"), new BigDecimal("106.650"), new BigDecimal("106.700"),
+                                new BigDecimal("106.655")
+                };
+
+                for (int i = 0; i < additionalDrivers.size(); i++) {
+                        User driver = additionalDrivers.get(i);
+                        DriverProfile profile = DriverProfile.builder()
+                                        .user(driver)
+                                        .vehicleDetails(vehicleBrands[i] + " " + vehicleModels[i])
+                                        .status("AVAILABLE")
+                                        .currentLatitude(baseLats[i])
+                                        .currentLongitude(baseLngs[i])
+                                        .averageRating(new BigDecimal("4." + (50 + i * 5)))
+                                        .codLimit(new BigDecimal("2000000"))
+                                        .completedTrips(20 + i * 10)
+                                        .nationalIdNumber("07920300" + (4456 + i))
+                                        .nationalIdStatus(StatusEnum.APPROVED)
+                                        .profilePhotoStatus(StatusEnum.APPROVED)
+                                        .driverLicenseNumber("B12345678" + i)
+                                        .driverLicenseClass("A1")
+                                        .driverLicenseExpiry(LocalDate.of(2027, 12, 31))
+                                        .driverLicenseStatus(StatusEnum.APPROVED)
+                                        .bankName("Vietcombank")
+                                        .bankAccountHolder(driver.getName())
+                                        .bankAccountNumber("012345678" + i)
+                                        .bankAccountStatus(StatusEnum.APPROVED)
+                                        .vehicleType("Motorbike")
+                                        .vehicleBrand(vehicleBrands[i])
+                                        .vehicleModel(vehicleModels[i])
+                                        .vehicleLicensePlate("59X3-" + (100 + i) + ".0" + i)
+                                        .vehicleYear(2019 + (i % 3))
+                                        .vehicleRegistrationStatus(StatusEnum.APPROVED)
+                                        .vehicleInsuranceExpiry(LocalDate.of(2026, 5 + i, 20))
+                                        .vehicleInsuranceStatus(StatusEnum.APPROVED)
+                                        .vehiclePhotoStatus(StatusEnum.APPROVED)
+                                        .criminalRecordNumber("CR12345" + i)
+                                        .criminalRecordIssueDate(LocalDate.of(2024, 1, 10 + i))
+                                        .criminalRecordStatus(StatusEnum.APPROVED)
+                                        .build();
+                        driverProfileRepository.save(profile);
+                }
+                log.info("✅ All driver profiles created (8 total)");
 
                 // 5. Create restaurant type
                 log.info("Creating restaurant types...");
@@ -514,11 +632,11 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("✅ Vouchers created");
 
                 log.info("========== Initial Data Setup Complete ==========");
-                log.info("Users created:");
-                log.info("   1. admin@gmail.com (password: 123456) - Wallet: 10,000,000 VND");
-                log.info("   2. restaurant@gmail.com (password: 123456) - Wallet: 5,000,000 VND");
-                log.info("   3. driver@gmail.com (password: 123456) - Wallet: 3,000,000 VND");
-                log.info("   4. customer@gmail.com (password: 123456) - Wallet: 2,000,000 VND");
+                log.info("Users created (25 total, all password: 123456):");
+                log.info("   - Admin: admin@gmail.com (Wallet: 10,000,000 VND)");
+                log.info("   - Customers (8): customer@gmail.com, customer2-8@gmail.com");
+                log.info("   - Restaurant Owners (8): restaurant@gmail.com, restaurant2-8@gmail.com");
+                log.info("   - Drivers (8): driver@gmail.com, driver2-8@gmail.com (with profiles)");
                 log.info("Restaurant: Bún bò mỡ nổi cô Như (6 dishes, 14 menu options, 3 vouchers)");
                 log.info("System configuration: 14 settings");
                 log.info("=======================================================");
