@@ -70,6 +70,7 @@ public class OrderService {
     private final RedisRejectionService redisRejectionService;
     private final OrderEarningsSummaryRepository orderEarningsSummaryRepository;
     private final UserScoringService userScoringService;
+    private final DynamicPricingService dynamicPricingService;
 
     public OrderService(OrderRepository orderRepository, UserService userService,
             RestaurantService restaurantService, VoucherService voucherService, DishService dishService,
@@ -84,7 +85,8 @@ public class OrderService {
             RedisGeoService redisGeoService,
             RedisRejectionService redisRejectionService,
             OrderEarningsSummaryRepository orderEarningsSummaryRepository,
-            @Lazy UserScoringService userScoringService) {
+            @Lazy UserScoringService userScoringService,
+            DynamicPricingService dynamicPricingService) {
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.restaurantService = restaurantService;
@@ -103,6 +105,7 @@ public class OrderService {
         this.redisRejectionService = redisRejectionService;
         this.orderEarningsSummaryRepository = orderEarningsSummaryRepository;
         this.userScoringService = userScoringService;
+        this.dynamicPricingService = dynamicPricingService;
     }
 
     public ResOrderDTO convertToResOrderDTO(Order order) {
@@ -261,6 +264,7 @@ public class OrderService {
 
     /**
      * Helper method to calculate delivery fee based on real driving distance
+     * with dynamic pricing (weather, peak hours, supply/demand)
      */
     private BigDecimal calculateDeliveryFee(Restaurant restaurant, BigDecimal deliveryLatitude,
             BigDecimal deliveryLongitude) throws IdInvalidException {
@@ -276,6 +280,7 @@ public class OrderService {
         BigDecimal baseFee = new BigDecimal("15000"); // Default 15,000 VND
         BigDecimal baseDistance = new BigDecimal("3"); // Default 3 km
         BigDecimal perKmFee = new BigDecimal("5000"); // Default 5,000 VND per km
+        BigDecimal minFee = new BigDecimal("10000"); // Default minimum fee 10,000 VND
 
         try {
             SystemConfiguration baseFeeConfig = systemConfigurationService
@@ -298,6 +303,13 @@ public class OrderService {
                     && !perKmFeeConfig.getConfigValue().isEmpty()) {
                 perKmFee = new BigDecimal(perKmFeeConfig.getConfigValue());
             }
+
+            SystemConfiguration minFeeConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_MIN_FEE");
+            if (minFeeConfig != null && minFeeConfig.getConfigValue() != null
+                    && !minFeeConfig.getConfigValue().isEmpty()) {
+                minFee = new BigDecimal(minFeeConfig.getConfigValue());
+            }
         } catch (Exception e) {
             log.warn("Failed to get delivery fee configuration, using defaults", e);
         }
@@ -314,21 +326,39 @@ public class OrderService {
             return baseFee;
         }
 
-        log.info("Delivery distance: {} km, Base distance: {} km, Base fee: {} VND, Per km fee: {} VND",
-                distance, baseDistance, baseFee, perKmFee);
+        // Get surge multiplier from dynamic pricing service
+        BigDecimal surgeMultiplier = dynamicPricingService.getSurgeMultiplier(
+                restaurant.getLatitude(),
+                restaurant.getLongitude());
 
-        // Calculate fee: if distance <= baseDistance, return baseFee
-        // Otherwise: baseFee + (distance - baseDistance) * perKmFee
+        // Calculate delivery fee using formula: F_base + D × R_km × K_surge
+        // Surge only applies to the distance-based fee, not the base fee
+        BigDecimal totalFee;
         if (distance.compareTo(baseDistance) <= 0) {
-            return baseFee;
+            // Within base distance, just charge base fee (no surge applied)
+            totalFee = baseFee;
         } else {
+            // Extra distance beyond base
             BigDecimal extraDistance = distance.subtract(baseDistance);
-            BigDecimal extraFee = extraDistance.multiply(perKmFee);
-            BigDecimal totalFee = baseFee.add(extraFee);
-            log.info("Calculated delivery fee: {} VND (base: {} + extra: {} for {} km)",
-                    totalFee, baseFee, extraFee, extraDistance);
-            return totalFee;
+            // Apply surge to distance component only: D × R_km × K_surge
+            BigDecimal surgedExtraFee = extraDistance.multiply(perKmFee).multiply(surgeMultiplier);
+            // Total = F_base + surged extra fee
+            totalFee = baseFee.add(surgedExtraFee)
+                    .setScale(0, java.math.RoundingMode.HALF_UP); // Round to whole VND
         }
+
+        // Ensure minimum fee: totalFee = max(minFee, calculatedFee)
+        if (totalFee.compareTo(minFee) < 0) {
+            totalFee = minFee;
+        }
+
+        log.info("📦 Delivery Fee Calculation:");
+        log.info("   Distance: {} km (base: {} km)", distance, baseDistance);
+        log.info("   Formula: F_base({}) + D({}) × R_km({}) × K_surge({})",
+                baseFee, distance.subtract(baseDistance).max(BigDecimal.ZERO), perKmFee, surgeMultiplier);
+        log.info("   Final fee: {} VND (min: {} VND)", totalFee, minFee);
+
+        return totalFee;
     }
 
     /**
@@ -1255,14 +1285,20 @@ public class OrderService {
             order.setPaymentStatus("PAID");
         }
 
-        // Update driver's completed trips count
+        // Update driver's completed trips count and set status to AVAILABLE
         Optional<DriverProfile> driverProfileOpt = driverProfileRepository.findByUserId(driver.getId());
+        DriverProfile driverProfile = null;
         if (driverProfileOpt.isPresent()) {
-            DriverProfile driverProfile = driverProfileOpt.get();
+            driverProfile = driverProfileOpt.get();
             Integer currentTrips = driverProfile.getCompletedTrips() != null ? driverProfile.getCompletedTrips() : 0;
             driverProfile.setCompletedTrips(currentTrips + 1);
-            driverProfileRepository.save(driverProfile);
-            log.info("Updated driver {} completed trips to {}", driver.getId(), currentTrips + 1);
+
+            // Set driver status back to AVAILABLE after completing delivery
+            driverProfile.setStatus("AVAILABLE");
+            driverProfile = driverProfileRepository.save(driverProfile);
+
+            log.info("🟢 Driver {} completed trips: {}, status: AVAILABLE",
+                    driver.getId(), currentTrips + 1);
         }
 
         // Create earnings summary when order is delivered
@@ -1276,6 +1312,18 @@ public class OrderService {
         webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
                 orderDTO, "Your order has been delivered successfully!");
         webSocketService.broadcastOrderStatusChange(orderDTO);
+
+        // After delivery, try to find and assign the next suitable order for this
+        // driver
+        if (driverProfile != null) {
+            log.info("🔍 Looking for next order for driver {} after completing delivery", driver.getId());
+            boolean assigned = driverProfileService.findAndAssignNextOrderForDriver(driver, driverProfile);
+            if (assigned) {
+                log.info("🎯 New order assigned to driver {} after completing delivery", driver.getId());
+            } else {
+                log.info("📭 No suitable orders found for driver {} after completing delivery", driver.getId());
+            }
+        }
 
         return orderDTO;
     }

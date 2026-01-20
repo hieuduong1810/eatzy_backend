@@ -45,4 +45,10 @@ public interface DriverProfileRepository
                         "AND dp.status IN ('ONLINE', 'AVAILABLE') " +
                         "AND w.balance >= 0")
         List<DriverProfile> findByUserIds(@Param("userIds") List<Long> userIds);
+
+        /**
+         * Count drivers by status
+         * Used for supply/demand calculation in dynamic pricing
+         */
+        long countByStatus(String status);
 }

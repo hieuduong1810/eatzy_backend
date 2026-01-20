@@ -42,4 +42,8 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     List<Order> findByOrderStatusAndPreparingAtBefore(String orderStatus, Instant preparingAt);
 
     List<Order> findByOrderStatusAndDriverIsNullOrderByPreparingAtAsc(String orderStatus);
+
+    // Count orders waiting for driver (status CONFIRMED or PREPARING with no
+    // driver)
+    long countByOrderStatusInAndDriverIsNull(java.util.List<String> statuses);
 }

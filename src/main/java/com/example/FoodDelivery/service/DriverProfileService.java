@@ -36,7 +36,7 @@ public class DriverProfileService {
     private final WebSocketService webSocketService;
     private final OrderService orderService;
 
-    public DriverProfileService(DriverProfileRepository driverProfileRepository, 
+    public DriverProfileService(DriverProfileRepository driverProfileRepository,
             UserService userService,
             OrderRepository orderRepository,
             MapboxService mapboxService,
@@ -278,7 +278,8 @@ public class DriverProfileService {
 
     /**
      * Driver goes online (opens app) - set status to AVAILABLE
-     * Also automatically finds and assigns the oldest waiting PREPARING order if available
+     * Also automatically finds and assigns the oldest waiting PREPARING order if
+     * available
      */
     @Transactional
     public ResDriverProfileDTO goOnline() throws IdInvalidException {
@@ -297,7 +298,7 @@ public class DriverProfileService {
         }
 
         DriverProfile profile = profileOpt.get();
-        
+
         // Validate driver location is set
         if (profile.getCurrentLatitude() == null || profile.getCurrentLongitude() == null) {
             throw new IdInvalidException("Driver location must be set before going online");
@@ -309,103 +310,131 @@ public class DriverProfileService {
 
         log.info("🟢 Driver {} (ID: {}) is now ONLINE", driver.getName(), driver.getId());
 
-        // STEP 1: Find all PREPARING orders without driver (ordered by oldest first)
-        List<Order> preparingOrders = orderRepository.findByOrderStatusAndDriverIsNullOrderByPreparingAtAsc("PREPARING");
-        
-        if (preparingOrders.isEmpty()) {
-            log.info("No PREPARING orders available for driver {}", driver.getId());
-            return convertToResDriverProfileDTO(savedProfile);
-        }
-
-        log.info("📋 Found {} PREPARING orders without driver", preparingOrders.size());
-
-        // Get search radius from system configuration (default 10 km if not set)
-        BigDecimal radiusKm = new BigDecimal("10.0");
-        try {
-            SystemConfiguration radiusConfig = systemConfigurationService
-                    .getSystemConfigurationByKey("DRIVER_SEARCH_RADIUS_KM");
-            if (radiusConfig != null && radiusConfig.getConfigValue() != null
-                    && !radiusConfig.getConfigValue().isEmpty()) {
-                radiusKm = new BigDecimal(radiusConfig.getConfigValue());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to get DRIVER_SEARCH_RADIUS_KM config, using default 10 km", e);
-        }
-
-        // STEP 2: Validate each order against business rules and find the first suitable one
-        for (Order order : preparingOrders) {
-            try {
-                Restaurant restaurant = order.getRestaurant();
-                if (restaurant == null || restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
-                    log.warn("Order {} has invalid restaurant location, skipping", order.getId());
-                    continue;
-                }
-
-                // STEP 2.1: Validate business rules
-                // If COD payment, check driver's COD limit
-                if ("COD".equals(order.getPaymentMethod())) {
-                    if (savedProfile.getCodLimit() == null || 
-                        savedProfile.getCodLimit().compareTo(order.getTotalAmount()) < 0) {
-                        log.info("❌ Order {} (COD: {}) exceeds driver's COD limit ({}), skipping",
-                                order.getId(), order.getTotalAmount(), savedProfile.getCodLimit());
-                        continue;
-                    }
-                }
-
-                // STEP 2.2: Calculate real driving distance using Mapbox API
-                BigDecimal distance = mapboxService.getDrivingDistance(
-                        savedProfile.getCurrentLatitude(),
-                        savedProfile.getCurrentLongitude(),
-                        restaurant.getLatitude(),
-                        restaurant.getLongitude());
-
-                if (distance == null) {
-                    log.warn("Failed to calculate distance for order {}, skipping", order.getId());
-                    continue;
-                }
-
-                log.info("📍 Order {} - Distance to restaurant: {} km (Max radius: {} km)",
-                        order.getId(), distance, radiusKm);
-
-                // STEP 2.3: Check if within radius
-                if (distance.compareTo(radiusKm) > 0) {
-                    log.info("❌ Order {} is {} km away, exceeds radius {} km, skipping",
-                            order.getId(), distance, radiusKm);
-                    continue;
-                }
-
-                // STEP 3: Order is suitable! Assign driver to this order
-                log.info("✅ Order {} passed all validations! Assigning driver {} (waiting time: {} minutes)",
-                        order.getId(), driver.getId(),
-                        java.time.Duration.between(order.getPreparingAt(), java.time.Instant.now()).toMinutes());
-
-                order.setDriver(driver);
-                Order updatedOrder = orderRepository.save(order);
-
-                // Convert to DTO for WebSocket notification
-                ResOrderDTO orderDTO = orderService.convertToResOrderDTO(updatedOrder);
-
-                // Notify driver about order assignment via WebSocket
-                webSocketService.notifyDriverOrderAssigned(driver.getId(), orderDTO);
-
-                // Notify customer about driver assignment
-                webSocketService.notifyCustomerOrderUpdate(
-                        order.getCustomer().getId(),
-                        orderDTO,
-                        "A driver has been assigned to your order");
-
-                log.info("🎯 Successfully auto-assigned order {} to driver {} upon going online",
-                        order.getId(), driver.getId());
-
-                break; // Only assign one order, then stop
-            } catch (Exception e) {
-                log.error("Error processing order {} for driver {}: {}",
-                        order.getId(), driver.getId(), e.getMessage(), e);
-                // Continue to next order
-            }
-        }
+        // Try to find and assign a suitable order
+        findAndAssignNextOrderForDriver(driver, savedProfile);
 
         return convertToResDriverProfileDTO(savedProfile);
+    }
+
+    /**
+     * Find and assign the next suitable order for a driver.
+     * Looks for PREPARING orders without driver, validates business rules, and
+     * assigns if found.
+     * This method is reusable - called from goOnline() and after delivery
+     * completion.
+     * 
+     * @param driver        The driver user
+     * @param driverProfile The driver's profile
+     * @return true if an order was assigned, false otherwise
+     */
+    @Transactional
+    public boolean findAndAssignNextOrderForDriver(User driver, DriverProfile driverProfile) {
+        try {
+            // STEP 1: Find all PREPARING orders without driver (ordered by oldest first)
+            List<Order> preparingOrders = orderRepository
+                    .findByOrderStatusAndDriverIsNullOrderByPreparingAtAsc("PREPARING");
+
+            if (preparingOrders.isEmpty()) {
+                log.info("No PREPARING orders available for driver {}", driver.getId());
+                return false;
+            }
+
+            log.info("📋 Found {} PREPARING orders without driver", preparingOrders.size());
+
+            // Get search radius from system configuration (default 10 km if not set)
+            BigDecimal radiusKm = new BigDecimal("10.0");
+            try {
+                SystemConfiguration radiusConfig = systemConfigurationService
+                        .getSystemConfigurationByKey("DRIVER_SEARCH_RADIUS_KM");
+                if (radiusConfig != null && radiusConfig.getConfigValue() != null
+                        && !radiusConfig.getConfigValue().isEmpty()) {
+                    radiusKm = new BigDecimal(radiusConfig.getConfigValue());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get DRIVER_SEARCH_RADIUS_KM config, using default 10 km", e);
+            }
+
+            // STEP 2: Validate each order against business rules and find the first
+            // suitable one
+            for (Order order : preparingOrders) {
+                try {
+                    Restaurant restaurant = order.getRestaurant();
+                    if (restaurant == null || restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
+                        log.warn("Order {} has invalid restaurant location, skipping", order.getId());
+                        continue;
+                    }
+
+                    // STEP 2.1: Validate business rules
+                    // If COD payment, check driver's COD limit
+                    if ("COD".equals(order.getPaymentMethod())) {
+                        if (driverProfile.getCodLimit() == null ||
+                                driverProfile.getCodLimit().compareTo(order.getTotalAmount()) < 0) {
+                            log.info("❌ Order {} (COD: {}) exceeds driver's COD limit ({}), skipping",
+                                    order.getId(), order.getTotalAmount(), driverProfile.getCodLimit());
+                            continue;
+                        }
+                    }
+
+                    // STEP 2.2: Calculate real driving distance using Mapbox API
+                    BigDecimal distance = mapboxService.getDrivingDistance(
+                            driverProfile.getCurrentLatitude(),
+                            driverProfile.getCurrentLongitude(),
+                            restaurant.getLatitude(),
+                            restaurant.getLongitude());
+
+                    if (distance == null) {
+                        log.warn("Failed to calculate distance for order {}, skipping", order.getId());
+                        continue;
+                    }
+
+                    log.info("📍 Order {} - Distance to restaurant: {} km (Max radius: {} km)",
+                            order.getId(), distance, radiusKm);
+
+                    // STEP 2.3: Check if within radius
+                    if (distance.compareTo(radiusKm) > 0) {
+                        log.info("❌ Order {} is {} km away, exceeds radius {} km, skipping",
+                                order.getId(), distance, radiusKm);
+                        continue;
+                    }
+
+                    // STEP 3: Order is suitable! Assign driver to this order
+                    log.info("✅ Order {} passed all validations! Assigning driver {} (waiting time: {} minutes)",
+                            order.getId(), driver.getId(),
+                            java.time.Duration.between(order.getPreparingAt(), java.time.Instant.now()).toMinutes());
+
+                    order.setDriver(driver);
+                    Order updatedOrder = orderRepository.save(order);
+
+                    // Convert to DTO for WebSocket notification
+                    ResOrderDTO orderDTO = orderService.convertToResOrderDTO(updatedOrder);
+
+                    // Notify driver about order assignment via WebSocket
+                    webSocketService.notifyDriverOrderAssigned(driver.getId(), orderDTO);
+
+                    // Notify customer about driver assignment
+                    webSocketService.notifyCustomerOrderUpdate(
+                            order.getCustomer().getId(),
+                            orderDTO,
+                            "A driver has been assigned to your order");
+
+                    log.info("🎯 Successfully auto-assigned order {} to driver {}",
+                            order.getId(), driver.getId());
+
+                    return true; // Only assign one order, then stop
+                } catch (Exception e) {
+                    log.error("Error processing order {} for driver {}: {}",
+                            order.getId(), driver.getId(), e.getMessage(), e);
+                    // Continue to next order
+                }
+            }
+
+            log.info("No suitable orders found for driver {}", driver.getId());
+            return false;
+
+        } catch (Exception e) {
+            log.error("Error finding next order for driver {}: {}", driver.getId(), e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
