@@ -43,7 +43,10 @@ public class ResRestaurantDTO {
     private Integer fourStarCount;
     private Integer fiveStarCount;
     private BigDecimal averageRating;
+    private Integer reviewCount; // Total number of reviews
     private String schedule;
+    private String avatarUrl; // Profile image
+    private String coverImageUrl; // Background image
     private BigDecimal distance; // Distance in km from user location
     private RestaurantType restaurantTypes;
 

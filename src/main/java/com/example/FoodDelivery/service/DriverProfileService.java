@@ -71,6 +71,45 @@ public class DriverProfileService {
         return profileOpt.map(this::convertToResDriverProfileDTO).orElse(null);
     }
 
+    /**
+     * Get the driver profile of the currently logged-in user
+     * 
+     * @return DriverProfile of current user
+     * @throws IdInvalidException if user is not logged in or doesn't have a driver
+     *                            profile
+     */
+    public DriverProfile getCurrentDriverProfile() throws IdInvalidException {
+        // Get current user's email from security context
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User is not logged in"));
+
+        // Find user by email
+        User currentUser = this.userService.handleGetUserByUsername(email);
+        if (currentUser == null) {
+            throw new IdInvalidException("User not found with email: " + email);
+        }
+
+        // Find driver profile by user
+        Optional<DriverProfile> profileOpt = this.driverProfileRepository.findByUserId(currentUser.getId());
+        if (profileOpt.isEmpty()) {
+            throw new IdInvalidException("No driver profile found for user: " + currentUser.getName());
+        }
+
+        return profileOpt.get();
+    }
+
+    /**
+     * Get the driver profile DTO of the currently logged-in user
+     * 
+     * @return ResDriverProfileDTO for the driver profile of current user
+     * @throws IdInvalidException if user is not logged in or doesn't have a driver
+     *                            profile
+     */
+    public ResDriverProfileDTO getCurrentDriverProfileDTO() throws IdInvalidException {
+        DriverProfile profile = getCurrentDriverProfile();
+        return convertToResDriverProfileDTO(profile);
+    }
+
     public ResDriverProfileDTO createDriverProfile(DriverProfile driverProfile) throws IdInvalidException {
         // check user exists
         if (driverProfile.getUser() != null) {

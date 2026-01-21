@@ -67,6 +67,12 @@ public class Restaurant {
 
     private String schedule; // e.g., "09:00-21:00"
 
+    @Column(name = "avatar_url")
+    private String avatarUrl; // Profile image
+
+    @Column(name = "cover_image_url")
+    private String coverImageUrl; // Background image
+
     @OneToMany(mappedBy = "restaurant", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<DishCategory> dishCategories;

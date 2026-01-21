@@ -16,7 +16,7 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMagazineDTO;
-import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO; 
+import com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO;
 import com.example.FoodDelivery.repository.RestaurantRepository;
 import com.example.FoodDelivery.repository.RestaurantTypeRepository;
 import com.example.FoodDelivery.repository.UserRestaurantScoreRepository;
@@ -86,7 +86,24 @@ public class RestaurantService {
         dto.setFourStarCount(restaurant.getFourStarCount());
         dto.setFiveStarCount(restaurant.getFiveStarCount());
         dto.setAverageRating(restaurant.getAverageRating());
+
+        // Calculate total review count
+        int reviewCount = 0;
+        if (restaurant.getOneStarCount() != null)
+            reviewCount += restaurant.getOneStarCount();
+        if (restaurant.getTwoStarCount() != null)
+            reviewCount += restaurant.getTwoStarCount();
+        if (restaurant.getThreeStarCount() != null)
+            reviewCount += restaurant.getThreeStarCount();
+        if (restaurant.getFourStarCount() != null)
+            reviewCount += restaurant.getFourStarCount();
+        if (restaurant.getFiveStarCount() != null)
+            reviewCount += restaurant.getFiveStarCount();
+        dto.setReviewCount(reviewCount);
+
         dto.setSchedule(restaurant.getSchedule());
+        dto.setAvatarUrl(restaurant.getAvatarUrl());
+        dto.setCoverImageUrl(restaurant.getCoverImageUrl());
 
         // Convert owner
         if (restaurant.getOwner() != null) {
@@ -251,7 +268,8 @@ public class RestaurantService {
 
     /**
      * Get restaurant DTO by ID with user tracking for recommendations
-     * @param id Restaurant ID
+     * 
+     * @param id   Restaurant ID
      * @param user Current user (can be null for anonymous access)
      * @return Restaurant DTO
      */
@@ -260,13 +278,14 @@ public class RestaurantService {
         if (restaurant == null) {
             return null;
         }
-        
+
         // Track user view for scoring (only if user is logged in)
         if (user != null && userScoringService != null) {
             userScoringService.trackViewRestaurantDetails(user, restaurant);
-            log.info("👁️ User {} viewed restaurant {}: tracking for recommendations", user.getId(), restaurant.getId());
+            log.info("👁️ User {} viewed restaurant {}: tracking for recommendations", user.getId(),
+                    restaurant.getId());
         }
-        
+
         return convertToResRestaurantDTO(restaurant);
     }
 
@@ -472,7 +491,8 @@ public class RestaurantService {
      *                      category name
      * @param spec          Specification for additional filtering
      * @param pageable      Pagination information
-     * @return Paginated list of nearby restaurants with distance and optional ranking scores
+     * @return Paginated list of nearby restaurants with distance and optional
+     *         ranking scores
      */
     public ResultPaginationDTO getNearbyRestaurants(BigDecimal latitude, BigDecimal longitude,
             String searchKeyword, Specification<Restaurant> spec, Pageable pageable) {
@@ -492,8 +512,8 @@ public class RestaurantService {
         }
 
         // 1. Build cache key (include userId for personalized cache)
-        String cacheKey = buildCacheKey(latitude, longitude, searchKeyword, pageable, 
-                                       currentUser != null ? currentUser.getId() : null);
+        String cacheKey = buildCacheKey(latitude, longitude, searchKeyword, pageable,
+                currentUser != null ? currentUser.getId() : null);
 
         // 2. Check cache first
         Object cachedResult = redisCacheService.get(cacheKey);
@@ -579,10 +599,10 @@ public class RestaurantService {
         // Calculate distances and scores
         List<ResRestaurantMagazineDTO> nearbyRestaurants = new ArrayList<>();
         final User finalCurrentUser = currentUser;
-        
+
         // Track search scoring only once per search (not per restaurant)
         boolean hasTrackedSearchScoring = false;
-        
+
         for (Restaurant restaurant : filteredRestaurants) {
             // Skip restaurants without location data
             if (restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
@@ -608,7 +628,8 @@ public class RestaurantService {
                 dto.setDistance(distance);
 
                 // Track user search scoring only once per search
-                if (!hasTrackedSearchScoring && finalCurrentUser != null && searchKeyword != null && !searchKeyword.trim().isEmpty()) {
+                if (!hasTrackedSearchScoring && finalCurrentUser != null && searchKeyword != null
+                        && !searchKeyword.trim().isEmpty()) {
                     boolean tracked = trackSearchScoring(finalCurrentUser, restaurant, searchKeyword);
                     if (tracked) {
                         hasTrackedSearchScoring = true;
@@ -622,8 +643,8 @@ public class RestaurantService {
                         double loyaltyScore = calculateLoyaltyScore(finalCurrentUser.getId(), restaurant);
                         double distanceScore = calculateDistanceScore(distance);
                         double qualityScore = calculateQualityScore(restaurant);
-                        double finalScore = (typeScore * 0.40) + (loyaltyScore * 0.30) + 
-                                          (distanceScore * 0.20) + (qualityScore * 0.10);
+                        double finalScore = (typeScore * 0.40) + (loyaltyScore * 0.30) +
+                                (distanceScore * 0.20) + (qualityScore * 0.10);
 
                         dto.setTypeScore(typeScore);
                         dto.setLoyaltyScore(loyaltyScore);
@@ -645,11 +666,11 @@ public class RestaurantService {
         }
 
         // Sort restaurants
-        if (finalCurrentUser != null && !nearbyRestaurants.isEmpty() 
-            && nearbyRestaurants.get(0).getFinalScore() != null) {
+        if (finalCurrentUser != null && !nearbyRestaurants.isEmpty()
+                && nearbyRestaurants.get(0).getFinalScore() != null) {
             // Sort by personalized final score (highest first)
             nearbyRestaurants.sort(Comparator.comparing(ResRestaurantMagazineDTO::getFinalScore).reversed());
-            log.info("📊 Sorted {} restaurants by personalized ranking for user {}", 
+            log.info("📊 Sorted {} restaurants by personalized ranking for user {}",
                     nearbyRestaurants.size(), finalCurrentUser.getId());
         } else {
             // Sort by distance (closest first) - default for non-logged-in users
@@ -706,7 +727,8 @@ public class RestaurantService {
     }
 
     /**
-     * Calculate S_Type: User's preference score for restaurant types (scaled to 100)
+     * Calculate S_Type: User's preference score for restaurant types (scaled to
+     * 100)
      * Formula: S_Type(100) = Min(100, (RawScore / 200) × 100)
      * Threshold: 200 points (e.g., ~40 orders of same food type)
      */
@@ -723,14 +745,15 @@ public class RestaurantService {
         if (rawScore == null || rawScore <= 0) {
             return 0.0;
         }
-        
+
         // Scale to 100: Min(100, (RawScore / 200) × 100)
         double scaledScore = (rawScore / 200.0) * 100.0;
         return Math.min(100.0, scaledScore);
     }
 
     /**
-     * Calculate S_Quen: User's loyalty/familiarity score with restaurant (scaled to 100)
+     * Calculate S_Quen: User's loyalty/familiarity score with restaurant (scaled to
+     * 100)
      * Formula: S_Quen(100) = Min(100, (RawScore / 50) × 100)
      * Threshold: 50 points (~5 orders at same restaurant = "loyal customer")
      */
@@ -739,7 +762,7 @@ public class RestaurantService {
         if (rawScore == null || rawScore <= 0) {
             return 0.0;
         }
-        
+
         // Scale to 100: Min(100, (RawScore / 50) × 100)
         double scaledScore = (rawScore / 50.0) * 100.0;
         return Math.min(100.0, scaledScore);
@@ -767,12 +790,13 @@ public class RestaurantService {
     }
 
     /**
-     * Track user search scoring based on how the restaurant matched the search keyword
+     * Track user search scoring based on how the restaurant matched the search
+     * keyword
      * - If keyword matches restaurant name: +2 restaurant score, +2 type score
      * - If keyword matches restaurant type: 0 restaurant score, +2 type score
      * 
-     * @param user Current logged-in user
-     * @param restaurant Restaurant found in search results
+     * @param user          Current logged-in user
+     * @param restaurant    Restaurant found in search results
      * @param searchKeyword The keyword user used to search
      * @return true if scoring was applied, false otherwise
      */
@@ -780,36 +804,75 @@ public class RestaurantService {
         if (user == null || restaurant == null || userScoringService == null) {
             return false;
         }
-        
+
         String keyword = searchKeyword.trim().toLowerCase();
-        
+
         // Check if search keyword exactly matches restaurant name (case-insensitive)
-        boolean matchedByRestaurantName = restaurant.getName() != null && 
+        boolean matchedByRestaurantName = restaurant.getName() != null &&
                 restaurant.getName().toLowerCase().equals(keyword);
-        
+
         // Check if search keyword exactly matches any restaurant type name
         boolean matchedByRestaurantType = false;
         if (restaurant.getRestaurantTypes() != null) {
             matchedByRestaurantType = restaurant.getRestaurantTypes().stream()
-                    .anyMatch(type -> type.getName() != null && 
+                    .anyMatch(type -> type.getName() != null &&
                             type.getName().toLowerCase().equals(keyword));
         }
-        
+
         // Apply scoring based on what matched
         if (matchedByRestaurantName) {
             // User searched by restaurant name: +2 restaurant, +2 type
             userScoringService.trackSearchRestaurantByNameAndClick(user, restaurant);
-            log.info("🔍 User {} searched '{}' - matched restaurant name '{}': +2 restaurant, +2 type", 
+            log.info("🔍 User {} searched '{}' - matched restaurant name '{}': +2 restaurant, +2 type",
                     user.getId(), searchKeyword, restaurant.getName());
             return true;
         } else if (matchedByRestaurantType) {
             // User searched by restaurant type: 0 restaurant, +2 type
             userScoringService.trackSearchDishAndClick(user, restaurant);
-            log.info("🍜 User {} searched '{}' - matched restaurant type in '{}': +2 type (once per search)", 
+            log.info("🍜 User {} searched '{}' - matched restaurant type in '{}': +2 type (once per search)",
                     user.getId(), searchKeyword, restaurant.getName());
             return true;
         }
-        
+
         return false;
+    }
+
+    /**
+     * Get the restaurant owned by the currently logged-in user
+     * 
+     * @return Restaurant owned by current user
+     * @throws IdInvalidException if user is not logged in or doesn't own a
+     *                            restaurant
+     */
+    public Restaurant getCurrentOwnerRestaurant() throws IdInvalidException {
+        // Get current user's email from security context
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User is not logged in"));
+
+        // Find user by email
+        User currentUser = this.userService.handleGetUserByUsername(email);
+        if (currentUser == null) {
+            throw new IdInvalidException("User not found with email: " + email);
+        }
+
+        // Find restaurant by owner
+        Optional<Restaurant> restaurantOpt = this.restaurantRepository.findByOwnerId(currentUser.getId());
+        if (restaurantOpt.isEmpty()) {
+            throw new IdInvalidException("No restaurant found for owner: " + currentUser.getName());
+        }
+
+        return restaurantOpt.get();
+    }
+
+    /**
+     * Get the restaurant DTO owned by the currently logged-in user
+     * 
+     * @return ResRestaurantDTO for the restaurant owned by current user
+     * @throws IdInvalidException if user is not logged in or doesn't own a
+     *                            restaurant
+     */
+    public ResRestaurantDTO getCurrentOwnerRestaurantDTO() throws IdInvalidException {
+        Restaurant restaurant = getCurrentOwnerRestaurant();
+        return convertToResRestaurantDTO(restaurant);
     }
 }

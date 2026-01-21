@@ -98,12 +98,12 @@ public class RestaurantController {
         } catch (Exception e) {
             // Ignore - user is not logged in
         }
-        
+
         // Use tracking method if user is logged in, otherwise use regular method
-        ResRestaurantDTO restaurant = currentUser != null 
-            ? restaurantService.getRestaurantDTOByIdWithTracking(id, currentUser)
-            : restaurantService.getRestaurantDTOById(id);
-            
+        ResRestaurantDTO restaurant = currentUser != null
+                ? restaurantService.getRestaurantDTOByIdWithTracking(id, currentUser)
+                : restaurantService.getRestaurantDTOById(id);
+
         if (restaurant == null) {
             throw new IdInvalidException("Restaurant not found with id: " + id);
         }
@@ -118,6 +118,21 @@ public class RestaurantController {
                 .getRestaurantMenuDTOById(id);
         if (menu == null) {
             throw new IdInvalidException("Restaurant not found with id: " + id);
+        }
+        return ResponseEntity.ok(menu);
+    }
+
+    @GetMapping("/restaurants/my-restaurant/menu")
+    @ApiMessage("Get current owner's restaurant menu")
+    public ResponseEntity<com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO> getMyRestaurantMenu()
+            throws IdInvalidException {
+        // Get the restaurant owned by current logged-in user
+        Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+
+        com.example.FoodDelivery.domain.res.restaurant.ResRestaurantMenuDTO menu = restaurantService
+                .getRestaurantMenuDTOById(restaurant.getId());
+        if (menu == null) {
+            throw new IdInvalidException("Restaurant menu not found");
         }
         return ResponseEntity.ok(menu);
     }

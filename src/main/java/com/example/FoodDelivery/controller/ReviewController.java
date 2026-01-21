@@ -30,9 +30,15 @@ import java.util.List;
 @RequestMapping("/api/v1")
 public class ReviewController {
     private final ReviewService reviewService;
+    private final com.example.FoodDelivery.service.RestaurantService restaurantService;
+    private final com.example.FoodDelivery.service.DriverProfileService driverProfileService;
 
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService,
+            com.example.FoodDelivery.service.RestaurantService restaurantService,
+            com.example.FoodDelivery.service.DriverProfileService driverProfileService) {
         this.reviewService = reviewService;
+        this.restaurantService = restaurantService;
+        this.driverProfileService = driverProfileService;
     }
 
     @PostMapping("/reviews")
@@ -89,6 +95,24 @@ public class ReviewController {
             @RequestParam("reviewTarget") String reviewTarget,
             @RequestParam("targetName") String targetName) {
         List<ResReviewDTO> reviews = reviewService.getReviewsByTarget(reviewTarget, targetName);
+        return ResponseEntity.ok(reviews);
+    }
+
+    @GetMapping("/reviews/my-restaurant")
+    @ApiMessage("Get reviews for current owner's restaurant")
+    public ResponseEntity<List<ResReviewDTO>> getReviewsForMyRestaurant() throws IdInvalidException {
+        // Get restaurant owned by current logged-in user
+        com.example.FoodDelivery.domain.Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+        List<ResReviewDTO> reviews = reviewService.getReviewsByTarget("restaurant", restaurant.getName());
+        return ResponseEntity.ok(reviews);
+    }
+
+    @GetMapping("/reviews/my-driver")
+    @ApiMessage("Get reviews for current driver")
+    public ResponseEntity<List<ResReviewDTO>> getReviewsForMyDriver() throws IdInvalidException {
+        // Get driver profile of current logged-in user
+        com.example.FoodDelivery.domain.DriverProfile driverProfile = driverProfileService.getCurrentDriverProfile();
+        List<ResReviewDTO> reviews = reviewService.getReviewsByTarget("driver", driverProfile.getUser().getName());
         return ResponseEntity.ok(reviews);
     }
 

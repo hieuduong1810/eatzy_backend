@@ -31,9 +31,15 @@ import java.util.Map;
 @RequestMapping("/api/v1")
 public class WalletTransactionController {
     private final WalletTransactionService walletTransactionService;
+    private final com.example.FoodDelivery.service.WalletService walletService;
+    private final com.example.FoodDelivery.service.UserService userService;
 
-    public WalletTransactionController(WalletTransactionService walletTransactionService) {
+    public WalletTransactionController(WalletTransactionService walletTransactionService,
+            com.example.FoodDelivery.service.WalletService walletService,
+            com.example.FoodDelivery.service.UserService userService) {
         this.walletTransactionService = walletTransactionService;
+        this.walletService = walletService;
+        this.userService = userService;
     }
 
     @PostMapping("/wallet-transactions")
@@ -137,6 +143,31 @@ public class WalletTransactionController {
     public ResponseEntity<List<resWalletTransactionDTO>> getWalletTransactionsByOrderId(
             @PathVariable("orderId") Long orderId) {
         List<resWalletTransactionDTO> transactions = walletTransactionService.getWalletTransactionsByOrderId(orderId);
+        return ResponseEntity.ok(transactions);
+    }
+
+    @GetMapping("/wallet-transactions/my-transactions")
+    @ApiMessage("Get wallet transactions for current logged-in user")
+    public ResponseEntity<List<resWalletTransactionDTO>> getMyWalletTransactions() throws IdInvalidException {
+        // Get current user's email from security context
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User is not logged in"));
+
+        // Find user by email
+        com.example.FoodDelivery.domain.User currentUser = userService.handleGetUserByUsername(email);
+        if (currentUser == null) {
+            throw new IdInvalidException("User not found with email: " + email);
+        }
+
+        // Get wallet for user
+        com.example.FoodDelivery.domain.Wallet wallet = walletService.getWalletByUserId(currentUser.getId());
+        if (wallet == null) {
+            throw new IdInvalidException("Wallet not found for user: " + currentUser.getName());
+        }
+
+        // Get transactions for wallet
+        List<resWalletTransactionDTO> transactions = walletTransactionService
+                .getWalletTransactionsByWalletId(wallet.getId());
         return ResponseEntity.ok(transactions);
     }
 

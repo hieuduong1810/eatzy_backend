@@ -34,9 +34,15 @@ import java.util.Map;
 @RequestMapping("/api/v1")
 public class OrderController {
     private final OrderService orderService;
+    private final com.example.FoodDelivery.service.RestaurantService restaurantService;
+    private final com.example.FoodDelivery.service.DriverProfileService driverProfileService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService,
+            com.example.FoodDelivery.service.RestaurantService restaurantService,
+            com.example.FoodDelivery.service.DriverProfileService driverProfileService) {
         this.orderService = orderService;
+        this.restaurantService = restaurantService;
+        this.driverProfileService = driverProfileService;
     }
 
     @PostMapping("/orders")
@@ -160,6 +166,24 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    @GetMapping("/orders/my-restaurant")
+    @ApiMessage("Get orders for current owner's restaurant")
+    public ResponseEntity<List<Order>> getOrdersByCurrentOwnerRestaurant() throws IdInvalidException {
+        // Get restaurant owned by current logged-in user
+        com.example.FoodDelivery.domain.Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+        List<Order> orders = orderService.getOrdersByRestaurantId(restaurant.getId());
+        return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/orders/my-driver")
+    @ApiMessage("Get orders for current driver")
+    public ResponseEntity<List<Order>> getOrdersByCurrentDriver() throws IdInvalidException {
+        // Get driver profile of current logged-in user
+        com.example.FoodDelivery.domain.DriverProfile driverProfile = driverProfileService.getCurrentDriverProfile();
+        List<Order> orders = orderService.getOrdersByDriverId(driverProfile.getUser().getId());
+        return ResponseEntity.ok(orders);
+    }
+
     @GetMapping("/orders/status/{orderStatus}")
     @ApiMessage("Get orders by status")
     public ResponseEntity<List<Order>> getOrdersByStatus(@PathVariable("orderStatus") String orderStatus) {
@@ -173,6 +197,16 @@ public class OrderController {
             @PathVariable("restaurantId") Long restaurantId,
             @PathVariable("orderStatus") String orderStatus) {
         List<ResOrderDTO> orders = orderService.getOrdersDTOByRestaurantIdAndStatus(restaurantId, orderStatus);
+        return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/orders/my-restaurant/status/{orderStatus}")
+    @ApiMessage("Get orders for current owner's restaurant by status")
+    public ResponseEntity<List<ResOrderDTO>> getOrdersByCurrentOwnerRestaurantAndStatus(
+            @PathVariable("orderStatus") String orderStatus) throws IdInvalidException {
+        // Get restaurant owned by current logged-in user
+        com.example.FoodDelivery.domain.Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+        List<ResOrderDTO> orders = orderService.getOrdersDTOByRestaurantIdAndStatus(restaurant.getId(), orderStatus);
         return ResponseEntity.ok(orders);
     }
 
