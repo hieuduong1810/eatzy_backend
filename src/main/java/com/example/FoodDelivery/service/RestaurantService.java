@@ -160,6 +160,8 @@ public class RestaurantService {
                                                         com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO groupDTO = new com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO();
                                                         groupDTO.setId(optionGroup.getId());
                                                         groupDTO.setName(optionGroup.getGroupName());
+                                                        groupDTO.setMinChoices(optionGroup.getMinChoices());
+                                                        groupDTO.setMaxChoices(optionGroup.getMaxChoices());
 
                                                         // Convert menu options
                                                         if (optionGroup.getMenuOptions() != null
