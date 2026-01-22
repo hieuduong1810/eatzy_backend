@@ -6,8 +6,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.sql.DataSource;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -31,14 +35,8 @@ public class DataInitializer implements CommandLineRunner {
         private final WalletService walletService;
         private final WalletRepository walletRepository;
         private final DriverProfileRepository driverProfileRepository;
-        private final RestaurantTypeRepository restaurantTypeRepository;
-        private final RestaurantRepository restaurantRepository;
-        private final DishCategoryRepository dishCategoryRepository;
-        private final DishRepository dishRepository;
-        private final MenuOptionGroupRepository menuOptionGroupRepository;
-        private final MenuOptionRepository menuOptionRepository;
         private final SystemConfigurationRepository systemConfigurationRepository;
-        private final VoucherRepository voucherRepository;
+        private final DataSource dataSource;
 
         public DataInitializer(
                         UserRepository userRepository,
@@ -48,14 +46,8 @@ public class DataInitializer implements CommandLineRunner {
                         WalletService walletService,
                         WalletRepository walletRepository,
                         DriverProfileRepository driverProfileRepository,
-                        RestaurantTypeRepository restaurantTypeRepository,
-                        RestaurantRepository restaurantRepository,
-                        DishCategoryRepository dishCategoryRepository,
-                        DishRepository dishRepository,
-                        MenuOptionGroupRepository menuOptionGroupRepository,
-                        MenuOptionRepository menuOptionRepository,
                         SystemConfigurationRepository systemConfigurationRepository,
-                        VoucherRepository voucherRepository) {
+                        DataSource dataSource) {
                 this.userRepository = userRepository;
                 this.roleRepository = roleRepository;
                 this.permissionRepository = permissionRepository;
@@ -63,14 +55,8 @@ public class DataInitializer implements CommandLineRunner {
                 this.walletService = walletService;
                 this.walletRepository = walletRepository;
                 this.driverProfileRepository = driverProfileRepository;
-                this.restaurantTypeRepository = restaurantTypeRepository;
-                this.restaurantRepository = restaurantRepository;
-                this.dishCategoryRepository = dishCategoryRepository;
-                this.dishRepository = dishRepository;
-                this.menuOptionGroupRepository = menuOptionGroupRepository;
-                this.menuOptionRepository = menuOptionRepository;
                 this.systemConfigurationRepository = systemConfigurationRepository;
-                this.voucherRepository = voucherRepository;
+                this.dataSource = dataSource;
         }
 
         @Override
@@ -108,12 +94,45 @@ public class DataInitializer implements CommandLineRunner {
                         log.info("✅ ADMIN role updated with {} permissions", allPermissions.size());
                 }
 
-                // 2. Create users
+                // 2. Create users - IMPORTANT: Create restaurant owners first (IDs 1-15) to
+                // match mockdata.sql owner_id
                 log.info("Creating users...");
+
+                // ============ CREATE 15 RESTAURANT OWNERS FIRST (IDs 1-15) ============
+                List<User> allRestaurantOwners = new ArrayList<>();
+
+                // First restaurant owner (will get ID 1)
+                User restaurantUser = new User();
+                restaurantUser.setName("restaurant");
+                restaurantUser.setEmail("restaurant@gmail.com");
+                restaurantUser.setPassword(passwordEncoder.encode("123456"));
+                restaurantUser.setGender(GenderEnum.FEMALE);
+                restaurantUser.setAddress("tp hcm");
+                restaurantUser.setAge(25);
+                restaurantUser.setIsActive(true);
+                restaurantUser.setRole(adminRole);
+                restaurantUser = userRepository.save(restaurantUser);
+                allRestaurantOwners.add(restaurantUser);
+                log.info("✅ Restaurant owner 1 created (ID: {})", restaurantUser.getId());
+
+                // Additional restaurant owners (IDs 2-15)
+                for (int i = 2; i <= 15; i++) {
+                        User owner = new User();
+                        owner.setName("restaurant" + i);
+                        owner.setEmail("restaurant" + i + "@gmail.com");
+                        owner.setPassword(passwordEncoder.encode("123456"));
+                        owner.setGender(i % 2 == 0 ? GenderEnum.MALE : GenderEnum.FEMALE);
+                        owner.setAddress("tp hcm");
+                        owner.setAge(25 + i);
+                        owner.setIsActive(true);
+                        owner.setRole(adminRole);
+                        owner = userRepository.save(owner);
+                        allRestaurantOwners.add(owner);
+                }
+                log.info("✅ 15 restaurant owners created (IDs 1-15)");
 
                 // Admin user
                 User adminUser = new User();
-                adminUser.setId(1L);
                 adminUser.setName("admin");
                 adminUser.setEmail("admin@gmail.com");
                 adminUser.setPassword(passwordEncoder.encode("123456"));
@@ -125,23 +144,8 @@ public class DataInitializer implements CommandLineRunner {
                 adminUser = userRepository.save(adminUser);
                 log.info("✅ Admin user created");
 
-                // Restaurant user
-                User restaurantUser = new User();
-                restaurantUser.setId(2L);
-                restaurantUser.setName("restaurant");
-                restaurantUser.setEmail("restaurant@gmail.com");
-                restaurantUser.setPassword(passwordEncoder.encode("123456"));
-                restaurantUser.setGender(GenderEnum.FEMALE);
-                restaurantUser.setAddress("tp hcm");
-                restaurantUser.setAge(25);
-                restaurantUser.setIsActive(true);
-                restaurantUser.setRole(adminRole);
-                restaurantUser = userRepository.save(restaurantUser);
-                log.info("✅ Restaurant user created");
-
                 // Driver user
                 User driverUser = new User();
-                driverUser.setId(3L);
                 driverUser.setName("driver");
                 driverUser.setEmail("driver@gmail.com");
                 driverUser.setPassword(passwordEncoder.encode("123456"));
@@ -155,7 +159,6 @@ public class DataInitializer implements CommandLineRunner {
 
                 // Customer user
                 User customerUser = new User();
-                customerUser.setId(4L);
                 customerUser.setName("customer");
                 customerUser.setEmail("customer@gmail.com");
                 customerUser.setPassword(passwordEncoder.encode("123456"));
@@ -184,23 +187,6 @@ public class DataInitializer implements CommandLineRunner {
                 }
                 log.info("✅ 14 additional customers created (customer2 - customer15)");
 
-                // ============ ADD 14 MORE RESTAURANT OWNERS ============
-                List<User> additionalOwners = new ArrayList<>();
-                for (int i = 2; i <= 15; i++) {
-                        User owner = new User();
-                        owner.setName("restaurant" + i);
-                        owner.setEmail("restaurant" + i + "@gmail.com");
-                        owner.setPassword(passwordEncoder.encode("123456"));
-                        owner.setGender(i % 2 == 0 ? GenderEnum.MALE : GenderEnum.FEMALE);
-                        owner.setAddress("tp hcm");
-                        owner.setAge(25 + i);
-                        owner.setIsActive(true);
-                        owner.setRole(adminRole);
-                        owner = userRepository.save(owner);
-                        additionalOwners.add(owner);
-                }
-                log.info("✅ 14 additional restaurant owners created (restaurant2 - restaurant15)");
-
                 // ============ ADD 14 MORE DRIVERS ============
                 List<User> additionalDrivers = new ArrayList<>();
                 for (int i = 2; i <= 15; i++) {
@@ -221,18 +207,17 @@ public class DataInitializer implements CommandLineRunner {
                 // 3. Create wallets for all users with initial balance
                 log.info("Creating wallets...");
                 createWalletWithBalance(adminUser, new BigDecimal("10000000")); // 10 million VND
-                createWalletWithBalance(restaurantUser, new BigDecimal("5000000")); // 5 million VND
                 createWalletWithBalance(driverUser, new BigDecimal("3000000")); // 3 million VND
                 createWalletWithBalance(customerUser, new BigDecimal("2000000")); // 2 million VND
+
+                // Wallets for restaurant owners
+                for (User owner : allRestaurantOwners) {
+                        createWalletWithBalance(owner, new BigDecimal("5000000")); // 5 million VND each
+                }
 
                 // Wallets for additional customers
                 for (User customer : additionalCustomers) {
                         createWalletWithBalance(customer, new BigDecimal("1000000")); // 1 million VND each
-                }
-
-                // Wallets for additional owners
-                for (User owner : additionalOwners) {
-                        createWalletWithBalance(owner, new BigDecimal("5000000")); // 5 million VND each
                 }
 
                 // Wallets for additional drivers
@@ -348,216 +333,21 @@ public class DataInitializer implements CommandLineRunner {
                 }
                 log.info("✅ All driver profiles created (15 total)");
 
-                // 5. Create restaurant type
-                log.info("Creating restaurant types...");
-                RestaurantType bunBoType = RestaurantType.builder()
-                                .name("Bún bò")
-                                .displayOrder(1)
-                                .build();
-                bunBoType = restaurantTypeRepository.save(bunBoType);
-                log.info("✅ Restaurant type created");
+                // 5. Run mockdata.sql to create restaurant types, restaurants, dishes,
+                // categories, options, and vouchers
+                log.info("Running mockdata.sql to initialize restaurant data...");
+                try {
+                        ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
+                        populator.addScript(new ClassPathResource("mockdata.sql"));
+                        populator.setSeparator(";");
+                        populator.execute(dataSource);
+                        log.info("✅ mockdata.sql executed successfully - restaurants, dishes, categories, options, and vouchers created");
+                } catch (Exception e) {
+                        log.error("❌ Failed to execute mockdata.sql: {}", e.getMessage());
+                        throw e;
+                }
 
-                // 6. Create restaurant
-                log.info("Creating restaurant...");
-                Restaurant restaurant = Restaurant.builder()
-                                .owner(restaurantUser)
-                                .name("Bún bò mỡ nổi cô Như")
-                                .address("232 Lý Thường Kiệt Phường Diên Hồng")
-                                .contactPhone("0963298168")
-                                .status("OPEN")
-                                .schedule("09:00-21:00")
-                                .latitude(new BigDecimal("10.77275706"))
-                                .longitude(new BigDecimal("106.6855084092"))
-                                .description(
-                                                "Quán bún bò mỡ nổi nằm sâu trong một con hẻm ở quận 3 (TP.HCM). Một hương vị suốt 30 năm, từ đời mẹ sang đời con nay thì vô cùng đông khách khi được Michelin lựa chọn gọi tên.")
-                                .restaurantTypes(List.of(bunBoType))
-                                .slug("bun-bo-mo-noi-co-nhu")
-                                .build();
-                restaurant = restaurantRepository.save(restaurant);
-                log.info("✅ Restaurant created");
-
-                // 7. Create dish categories
-                log.info("Creating dish categories...");
-                DishCategory signatureBowls = DishCategory.builder()
-                                .restaurant(restaurant)
-                                .name("Signature Bowls")
-                                .displayOrder(1)
-                                .build();
-                signatureBowls = dishCategoryRepository.save(signatureBowls);
-
-                DishCategory sideDishes = DishCategory.builder()
-                                .restaurant(restaurant)
-                                .name("Side Dishes")
-                                .displayOrder(2)
-                                .build();
-                sideDishes = dishCategoryRepository.save(sideDishes);
-
-                DishCategory drinks = DishCategory.builder()
-                                .restaurant(restaurant)
-                                .name("Drinks")
-                                .displayOrder(3)
-                                .build();
-                drinks = dishCategoryRepository.save(drinks);
-                log.info("✅ Dish categories created");
-
-                // 8. Create dishes
-                log.info("Creating dishes...");
-                Dish bunBoDacBiet = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(signatureBowls)
-                                .name("Bún bò mỡ nổi đặc biệt")
-                                .description("Tô đặc biệt nhiều thịt, chả, giò và mỡ nổi đúng chuẩn")
-                                .price(new BigDecimal("65000"))
-                                .imageUrl("https://example.com/bun-bo-mo-noi-dac-biet.jpg")
-                                .availabilityQuantity(50)
-                                .build();
-                bunBoDacBiet = dishRepository.save(bunBoDacBiet);
-
-                Dish bunBoThuong = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(signatureBowls)
-                                .name("Bún bò mỡ nổi tô thường")
-                                .description("Tô thường với bò và nước dùng mỡ nổi béo thơm")
-                                .price(new BigDecimal("50000"))
-                                .imageUrl("https://example.com/bun-bo-mo-noi-thuong.jpg")
-                                .availabilityQuantity(50)
-                                .build();
-                bunBoThuong = dishRepository.save(bunBoThuong);
-
-                Dish chaCua = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(sideDishes)
-                                .name("Chả cua handmade")
-                                .description("Chả cua dai thơm, ăn kèm bún bò")
-                                .price(new BigDecimal("15000"))
-                                .imageUrl("https://example.com/cha-cua.jpg")
-                                .availabilityQuantity(30)
-                                .build();
-                chaCua = dishRepository.save(chaCua);
-
-                Dish gioBo = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(sideDishes)
-                                .name("Giò bò")
-                                .description("Khoanh giò bò chất lượng cao")
-                                .price(new BigDecimal("15000"))
-                                .imageUrl("https://example.com/gio-bo.jpg")
-                                .availabilityQuantity(25)
-                                .build();
-                gioBo = dishRepository.save(gioBo);
-
-                Dish traDa = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(drinks)
-                                .name("Trà đá")
-                                .description("Ly trà đá mát lạnh")
-                                .price(new BigDecimal("5000"))
-                                .imageUrl("https://example.com/tra-da.jpg")
-                                .availabilityQuantity(200)
-                                .build();
-                traDa = dishRepository.save(traDa);
-
-                Dish samBiDao = Dish.builder()
-                                .restaurant(restaurant)
-                                .category(drinks)
-                                .name("Sâm bí đao")
-                                .description("Nước sâm bí đao nấu tại quán")
-                                .price(new BigDecimal("12000"))
-                                .imageUrl("https://example.com/sam-bi-dao.jpg")
-                                .availabilityQuantity(100)
-                                .build();
-                samBiDao = dishRepository.save(samBiDao);
-                log.info("✅ Dishes created");
-
-                // 9. Create menu option groups and options
-                log.info("Creating menu option groups and options...");
-
-                // For Bún bò đặc biệt
-                MenuOptionGroup mucMoGroup1 = MenuOptionGroup.builder()
-                                .dish(bunBoDacBiet)
-                                .groupName("Mức mỡ")
-                                .minChoices(1)
-                                .maxChoices(1)
-                                .build();
-                mucMoGroup1 = menuOptionGroupRepository.save(mucMoGroup1);
-
-                MenuOptionGroup toppingGroup1 = MenuOptionGroup.builder()
-                                .dish(bunBoDacBiet)
-                                .groupName("Topping thêm")
-                                .minChoices(0)
-                                .maxChoices(5)
-                                .build();
-                toppingGroup1 = menuOptionGroupRepository.save(toppingGroup1);
-
-                // For Bún bò thường
-                MenuOptionGroup mucMoGroup2 = MenuOptionGroup.builder()
-                                .dish(bunBoThuong)
-                                .groupName("Mức mỡ")
-                                .minChoices(1)
-                                .maxChoices(1)
-                                .build();
-                mucMoGroup2 = menuOptionGroupRepository.save(mucMoGroup2);
-
-                MenuOptionGroup toppingGroup2 = MenuOptionGroup.builder()
-                                .dish(bunBoThuong)
-                                .groupName("Topping thêm")
-                                .minChoices(0)
-                                .maxChoices(5)
-                                .build();
-                toppingGroup2 = menuOptionGroupRepository.save(toppingGroup2);
-
-                // Create menu options for group 1 (Mức mỡ - Bún bò đặc biệt)
-                List<MenuOption> menuOptions1 = List.of(
-                                MenuOption.builder().menuOptionGroup(mucMoGroup1).name("Ít mỡ")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(mucMoGroup1).name("Vừa")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(mucMoGroup1).name("Nhiều mỡ")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build());
-                menuOptionRepository.saveAll(menuOptions1);
-
-                // Create menu options for group 2 (Topping thêm - Bún bò đặc biệt)
-                List<MenuOption> menuOptions2 = List.of(
-                                MenuOption.builder().menuOptionGroup(toppingGroup1).name("Chả cua thêm")
-                                                .priceAdjustment(new BigDecimal("15000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup1).name("Giò bò thêm")
-                                                .priceAdjustment(new BigDecimal("15000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup1).name("Thịt bò thêm")
-                                                .priceAdjustment(new BigDecimal("20000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup1).name("Huyết thêm")
-                                                .priceAdjustment(new BigDecimal("5000")).isAvailable(true).build());
-                menuOptionRepository.saveAll(menuOptions2);
-
-                // Create menu options for group 3 (Mức mỡ - Bún bò thường)
-                List<MenuOption> menuOptions3 = List.of(
-                                MenuOption.builder().menuOptionGroup(mucMoGroup2).name("Ít mỡ")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(mucMoGroup2).name("Vừa")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(mucMoGroup2).name("Nhiều mỡ")
-                                                .priceAdjustment(BigDecimal.ZERO)
-                                                .isAvailable(true).build());
-                menuOptionRepository.saveAll(menuOptions3);
-
-                // Create menu options for group 4 (Topping thêm - Bún bò thường)
-                List<MenuOption> menuOptions4 = List.of(
-                                MenuOption.builder().menuOptionGroup(toppingGroup2).name("Chả cua thêm")
-                                                .priceAdjustment(new BigDecimal("15000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup2).name("Giò bò thêm")
-                                                .priceAdjustment(new BigDecimal("15000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup2).name("Thịt bò thêm")
-                                                .priceAdjustment(new BigDecimal("20000")).isAvailable(true).build(),
-                                MenuOption.builder().menuOptionGroup(toppingGroup2).name("Huyết thêm")
-                                                .priceAdjustment(new BigDecimal("5000")).isAvailable(true).build());
-                menuOptionRepository.saveAll(menuOptions4);
-                log.info("✅ Menu option groups and options created");
-
-                // 10. Create system configuration
+                // 6. Create system configuration
                 log.info("Creating system configuration...");
                 List<SystemConfiguration> configs = new ArrayList<>();
 
@@ -591,57 +381,21 @@ public class DataInitializer implements CommandLineRunner {
                 systemConfigurationRepository.saveAll(configs);
                 log.info("✅ System configuration created");
 
-                // 11. Create vouchers
-                log.info("Creating vouchers...");
-                List<Voucher> vouchers = new ArrayList<>();
-
-                vouchers.add(Voucher.builder()
-                                .code("CHAO2025")
-                                .description("Giảm 30k cho đơn từ 100k cho khách hàng mới")
-                                .discountType("FIXED")
-                                .discountValue(new BigDecimal("30000.00"))
-                                .endDate(Instant.parse("2026-01-31T16:59:59.000Z"))
-                                .minOrderValue(new BigDecimal("100000.00"))
-                                .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
-                                .totalQuantity(1000)
-                                .restaurants(List.of(restaurant))
-                                .build());
-
-                vouchers.add(Voucher.builder()
-                                .code("SIEUDEAL50")
-                                .description("Giảm 50% tối đa 50k cho mọi đơn hàng")
-                                .discountType("PERCENTAGE")
-                                .discountValue(new BigDecimal("50.00"))
-                                .endDate(Instant.parse("2026-01-31T16:59:59.000Z"))
-                                .minOrderValue(new BigDecimal("0.00"))
-                                .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
-                                .totalQuantity(500)
-                                .restaurants(List.of(restaurant))
-                                .maxDiscountAmount(new BigDecimal("50000.00"))
-                                .build());
-
-                vouchers.add(Voucher.builder()
-                                .code("FREESHIP")
-                                .description("miễn phí giao hàng")
-                                .discountType("FREESHIP")
-                                .endDate(Instant.parse("2026-01-31T16:59:59.000Z"))
-                                .minOrderValue(new BigDecimal("0.00"))
-                                .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
-                                .totalQuantity(500)
-                                .restaurants(List.of(restaurant))
-                                .build());
-
-                voucherRepository.saveAll(vouchers);
-                log.info("✅ Vouchers created");
-
                 log.info("========== Initial Data Setup Complete ==========");
                 log.info("Users created (46 total, all password: 123456):");
                 log.info("   - Admin: admin@gmail.com (Wallet: 10,000,000 VND)");
                 log.info("   - Customers (15): customer@gmail.com, customer2-15@gmail.com");
                 log.info("   - Restaurant Owners (15): restaurant@gmail.com, restaurant2-15@gmail.com");
                 log.info("   - Drivers (15): driver@gmail.com, driver2-15@gmail.com (with profiles)");
-                log.info("Restaurant: Bún bò mỡ nổi cô Như (6 dishes, 14 menu options, 3 vouchers)");
-                log.info("System configuration: 12 settings");
+                log.info("Restaurant data loaded from mockdata.sql:");
+                log.info("   - 5 restaurant types");
+                log.info("   - 15 restaurants");
+                log.info("   - 45 dish categories");
+                log.info("   - 84 dishes");
+                log.info("   - 112 menu option groups");
+                log.info("   - 260 menu options");
+                log.info("   - 50 vouchers");
+                log.info("System configuration: 13 settings");
                 log.info("=======================================================");
         }
 
