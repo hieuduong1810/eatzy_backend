@@ -248,7 +248,20 @@ public class OrderController {
     @PatchMapping("/orders/{id}/restaurant/accept")
     @ApiMessage("Accept order")
     public ResponseEntity<ResOrderDTO> acceptOrder(@PathVariable("id") Long orderId) throws IdInvalidException {
-        ResOrderDTO order = orderService.acceptOrder(orderId);
+        ResOrderDTO order = orderService.acceptOrderByRestaurant(orderId);
+        return ResponseEntity.ok(order);
+    }
+
+    @PatchMapping("/orders/{id}/restaurant/reject")
+    @ApiMessage("Reject order by restaurant")
+    public ResponseEntity<ResOrderDTO> rejectOrderByRestaurant(
+            @PathVariable("id") Long orderId,
+            @RequestBody Map<String, String> body) throws IdInvalidException {
+        String cancellationReason = body.get("cancellationReason");
+        if (cancellationReason == null || cancellationReason.trim().isEmpty()) {
+            throw new IdInvalidException("Cancellation reason is required");
+        }
+        ResOrderDTO order = orderService.rejectOrderByRestaurant(orderId, cancellationReason);
         return ResponseEntity.ok(order);
     }
 

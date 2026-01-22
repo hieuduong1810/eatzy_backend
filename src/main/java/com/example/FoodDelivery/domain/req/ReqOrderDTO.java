@@ -32,7 +32,6 @@ public class ReqOrderDTO {
 
     private BigDecimal subtotal;
 
-    @NotNull(message = "Phí giao hàng không được để trống")
     private BigDecimal deliveryFee;
 
     private BigDecimal totalAmount;

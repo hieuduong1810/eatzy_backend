@@ -955,7 +955,7 @@ public class OrderService {
 
         // Notify customer about order rejection
         webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
-                orderDTO, "Your order has been rejected by the restaurant");
+                orderDTO, "Your order has been cancelled");
 
         webSocketService.broadcastOrderStatusChange(orderDTO);
 
@@ -963,6 +963,41 @@ public class OrderService {
     }
 
     // RESTAURANT ACTIONS
+    @Transactional
+    public ResOrderDTO rejectOrderByRestaurant(Long orderId, String cancellationReason) throws IdInvalidException {
+        Order order = getOrderById(orderId);
+        if (order == null) {
+            throw new IdInvalidException("Order not found with id: " + orderId);
+        }
+
+        if (!"PENDING".equals(order.getOrderStatus())) {
+            throw new IdInvalidException(
+                    "Can only reject orders with PENDING status. Current status: " + order.getOrderStatus());
+        }
+
+        order.setOrderStatus("REJECTED");
+        order.setCancellationReason(cancellationReason);
+
+        // If payment was already made (WALLET or VNPAY), process refund
+        if ("PAID".equals(order.getPaymentStatus()) &&
+                ("WALLET".equals(order.getPaymentMethod()) || "VNPAY".equals(order.getPaymentMethod()))) {
+            paymentService.processRefund(order);
+            order.setPaymentStatus("REFUNDED");
+        }
+
+        order = orderRepository.save(order);
+
+        ResOrderDTO orderDTO = convertToResOrderDTO(order);
+
+        // Notify customer about order rejection by restaurant
+        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+                orderDTO, "Your order has been rejected by the restaurant");
+
+        webSocketService.broadcastOrderStatusChange(orderDTO);
+
+        return orderDTO;
+    }
+
     @Transactional
     public ResOrderDTO markOrderAsReady(Long orderId) throws IdInvalidException {
         Order order = getOrderById(orderId);
@@ -992,7 +1027,7 @@ public class OrderService {
     }
 
     @Transactional
-    public ResOrderDTO acceptOrder(Long orderId) throws IdInvalidException {
+    public ResOrderDTO acceptOrderByRestaurant(Long orderId) throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + orderId);
