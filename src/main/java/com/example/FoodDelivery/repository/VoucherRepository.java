@@ -15,19 +15,20 @@ import java.util.List;
 
 @Repository
 public interface VoucherRepository extends JpaRepository<Voucher, Long>, JpaSpecificationExecutor<Voucher> {
-    Optional<Voucher> findByCode(String code);
+        Optional<Voucher> findByCode(String code);
 
-    boolean existsByCode(String code);
+        boolean existsByCode(String code);
 
-    List<Voucher> findByRestaurantId(Long restaurantId);
+        @Query("SELECT v FROM Voucher v JOIN v.restaurants r WHERE r.id = :restaurantId")
+        List<Voucher> findByRestaurantId(@Param("restaurantId") Long restaurantId);
 
-    @Query("SELECT v FROM Voucher v WHERE " +
-            "(v.restaurant.id = :restaurantId OR v.restaurant IS NULL) AND " +
-            "v.startDate <= :currentTime AND v.endDate >= :currentTime AND " +
-            "v.minOrderValue <= :orderValue AND " +
-            "v.totalQuantity > 0")
-    List<Voucher> findAvailableVouchersForOrder(
-            @Param("restaurantId") Long restaurantId,
-            @Param("orderValue") BigDecimal orderValue,
-            @Param("currentTime") Instant currentTime);
+        @Query("SELECT DISTINCT v FROM Voucher v LEFT JOIN v.restaurants r WHERE " +
+                        "(r.id = :restaurantId OR v.restaurants IS EMPTY) AND " +
+                        "v.startDate <= :currentTime AND v.endDate >= :currentTime AND " +
+                        "v.minOrderValue <= :orderValue AND " +
+                        "v.totalQuantity > 0")
+        List<Voucher> findAvailableVouchersForOrder(
+                        @Param("restaurantId") Long restaurantId,
+                        @Param("orderValue") BigDecimal orderValue,
+                        @Param("currentTime") Instant currentTime);
 }

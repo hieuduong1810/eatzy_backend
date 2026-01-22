@@ -2,6 +2,7 @@ package com.example.FoodDelivery.domain.res.voucher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,7 +25,7 @@ public class resVoucherDTO {
     private Instant endDate;
     private Integer totalQuantity;
     private String creatorType;
-    private Restaurant restaurant;
+    private List<Restaurant> restaurants;
 
     @Getter
     @Setter

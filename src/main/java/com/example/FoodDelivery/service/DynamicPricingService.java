@@ -75,10 +75,8 @@ public class DynamicPricingService {
                 .setScale(2, RoundingMode.HALF_UP);
 
         // Cap at maximum surge multiplier
-        BigDecimal maxSurge = getMaxSurgeFromConfig();
-        if (combinedSurge.compareTo(maxSurge) > 0) {
-            log.info("Surge multiplier {} exceeds max {}, capping", combinedSurge, maxSurge);
-            combinedSurge = maxSurge;
+        if (combinedSurge.compareTo(MAX_SURGE_MULTIPLIER) > 0) {
+            combinedSurge = MAX_SURGE_MULTIPLIER;
         }
 
         // Ensure minimum multiplier is 1.0

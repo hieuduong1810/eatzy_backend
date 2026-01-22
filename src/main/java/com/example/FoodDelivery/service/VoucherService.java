@@ -1,5 +1,6 @@
 package com.example.FoodDelivery.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -54,11 +55,16 @@ public class VoucherService {
         dto.setEndDate(voucher.getEndDate());
         dto.setTotalQuantity(voucher.getTotalQuantity());
 
-        if (voucher.getRestaurant() != null) {
-            resVoucherDTO.Restaurant restaurantDTO = new resVoucherDTO.Restaurant();
-            restaurantDTO.setId(voucher.getRestaurant().getId());
-            restaurantDTO.setName(voucher.getRestaurant().getName());
-            dto.setRestaurant(restaurantDTO);
+        if (voucher.getRestaurants() != null && !voucher.getRestaurants().isEmpty()) {
+            List<resVoucherDTO.Restaurant> restaurantDTOs = voucher.getRestaurants().stream()
+                    .map(r -> {
+                        resVoucherDTO.Restaurant restaurantDTO = new resVoucherDTO.Restaurant();
+                        restaurantDTO.setId(r.getId());
+                        restaurantDTO.setName(r.getName());
+                        return restaurantDTO;
+                    })
+                    .collect(Collectors.toList());
+            dto.setRestaurants(restaurantDTOs);
         }
 
         return dto;
@@ -91,13 +97,17 @@ public class VoucherService {
             throw new IdInvalidException("Voucher code already exists: " + voucher.getCode());
         }
 
-        // check restaurant exists if provided
-        if (voucher.getRestaurant() != null) {
-            Restaurant restaurant = this.restaurantRepository.findById(voucher.getRestaurant().getId()).orElse(null);
-            if (restaurant == null) {
-                throw new IdInvalidException("Restaurant not found with id: " + voucher.getRestaurant().getId());
+        // check restaurants exist if provided
+        if (voucher.getRestaurants() != null && !voucher.getRestaurants().isEmpty()) {
+            List<Restaurant> restaurants = new ArrayList<>();
+            for (Restaurant r : voucher.getRestaurants()) {
+                Restaurant restaurant = this.restaurantRepository.findById(r.getId()).orElse(null);
+                if (restaurant == null) {
+                    throw new IdInvalidException("Restaurant not found with id: " + r.getId());
+                }
+                restaurants.add(restaurant);
             }
-            voucher.setRestaurant(restaurant);
+            voucher.setRestaurants(restaurants);
         }
 
         Voucher savedVoucher = voucherRepository.save(voucher);
@@ -145,12 +155,16 @@ public class VoucherService {
         if (voucher.getTotalQuantity() != null) {
             currentVoucher.setTotalQuantity(voucher.getTotalQuantity());
         }
-        if (voucher.getRestaurant() != null) {
-            Restaurant restaurant = this.restaurantRepository.findById(voucher.getRestaurant().getId()).orElse(null);
-            if (restaurant == null) {
-                throw new IdInvalidException("Restaurant not found with id: " + voucher.getRestaurant().getId());
+        if (voucher.getRestaurants() != null && !voucher.getRestaurants().isEmpty()) {
+            List<Restaurant> restaurants = new ArrayList<>();
+            for (Restaurant r : voucher.getRestaurants()) {
+                Restaurant restaurant = this.restaurantRepository.findById(r.getId()).orElse(null);
+                if (restaurant == null) {
+                    throw new IdInvalidException("Restaurant not found with id: " + r.getId());
+                }
+                restaurants.add(restaurant);
             }
-            currentVoucher.setRestaurant(restaurant);
+            currentVoucher.setRestaurants(restaurants);
         }
 
         Voucher savedVoucher = voucherRepository.save(currentVoucher);

@@ -15,7 +15,7 @@ public class ReqOrderDTO {
 
     private Driver driver;
 
-    private Voucher voucher;
+    private List<Voucher> vouchers;
 
     private String orderStatus;
 
@@ -265,12 +265,12 @@ public class ReqOrderDTO {
         this.driver = driver;
     }
 
-    public Voucher getVoucher() {
-        return voucher;
+    public List<Voucher> getVouchers() {
+        return vouchers;
     }
 
-    public void setVoucher(Voucher voucher) {
-        this.voucher = voucher;
+    public void setVouchers(List<Voucher> vouchers) {
+        this.vouchers = vouchers;
     }
 
     public String getOrderStatus() {

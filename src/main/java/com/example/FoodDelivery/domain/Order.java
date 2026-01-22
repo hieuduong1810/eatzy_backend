@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "orders")
 @Getter
@@ -30,9 +32,9 @@ public class Order {
     @JoinColumn(name = "driver_id")
     private User driver;
 
-    @ManyToOne
-    @JoinColumn(name = "voucher_id")
-    private Voucher voucher;
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "orders")
+    @JsonIgnore
+    private List<Voucher> vouchers;
 
     private String orderStatus;
 
@@ -69,6 +71,7 @@ public class Order {
     private Instant createdAt;
     private Instant preparingAt;
     private Instant deliveredAt;
+    private Instant assignedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems;

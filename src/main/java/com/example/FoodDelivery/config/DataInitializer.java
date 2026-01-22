@@ -571,6 +571,7 @@ public class DataInitializer implements CommandLineRunner {
                                 adminUser));
                 configs.add(createConfig("DELIVERY_PER_KM_FEE", "5000", "Phí ship cộng thêm cho mỗi km tiếp theo (VND)",
                                 adminUser));
+                configs.add(createConfig("DELIVERY_MIN_FEE", "10000", "Phí ship tối thiểu (VND)", adminUser));
                 configs.add(createConfig("DRIVER_SEARCH_RADIUS_KM", "5",
                                 "Bán kính tìm kiếm tài xế xung quanh quán (km)",
                                 adminUser));
@@ -603,7 +604,7 @@ public class DataInitializer implements CommandLineRunner {
                                 .minOrderValue(new BigDecimal("100000.00"))
                                 .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
                                 .totalQuantity(1000)
-                                .restaurant(restaurant)
+                                .restaurants(List.of(restaurant))
                                 .build());
 
                 vouchers.add(Voucher.builder()
@@ -615,7 +616,7 @@ public class DataInitializer implements CommandLineRunner {
                                 .minOrderValue(new BigDecimal("0.00"))
                                 .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
                                 .totalQuantity(500)
-                                .restaurant(restaurant)
+                                .restaurants(List.of(restaurant))
                                 .maxDiscountAmount(new BigDecimal("50000.00"))
                                 .build());
 
@@ -627,7 +628,7 @@ public class DataInitializer implements CommandLineRunner {
                                 .minOrderValue(new BigDecimal("0.00"))
                                 .startDate(Instant.parse("2024-12-31T17:00:00.000Z"))
                                 .totalQuantity(500)
-                                .restaurant(restaurant)
+                                .restaurants(List.of(restaurant))
                                 .build());
 
                 voucherRepository.saveAll(vouchers);

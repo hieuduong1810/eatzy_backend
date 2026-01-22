@@ -151,4 +151,61 @@ public class OrderCleanupService {
             log.error("Error during auto-cancel cleanup: {}", e.getMessage(), e);
         }
     }
+
+    /**
+     * Automatically accept orders assigned to drivers who haven't responded within timeout
+     * Runs every 10 seconds
+     */
+    @Scheduled(fixedRate = 10000) // 10 seconds = 10,000 milliseconds
+    @Transactional
+    public void autoAcceptUnrespondedOrders() {
+        try {
+            // Get timeout from system configuration (default 30 seconds)
+            int acceptTimeoutSeconds = 30;
+            try {
+                SystemConfiguration config = systemConfigurationService
+                        .getSystemConfigurationByKey("DRIVER_ACCEPT_TIMEOUT_SEC");
+                if (config != null && config.getConfigValue() != null && !config.getConfigValue().isEmpty()) {
+                    acceptTimeoutSeconds = Integer.parseInt(config.getConfigValue());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get DRIVER_ACCEPT_TIMEOUT_SEC config, using default {} seconds",
+                        acceptTimeoutSeconds);
+            }
+
+            // Calculate cutoff time
+            Instant cutoffTime = Instant.now().minus(acceptTimeoutSeconds, ChronoUnit.SECONDS);
+
+            // Find orders with status PREPARING, driver assigned, but not accepted yet (assignedAt is set)
+            List<Order> unrespondedOrders = orderRepository
+                    .findByOrderStatusAndDriverIsNotNullAndAssignedAtBefore("PREPARING", cutoffTime);
+
+            if (!unrespondedOrders.isEmpty()) {
+                log.info("Found {} orders with unresponsive drivers (timeout: {} seconds)",
+                        unrespondedOrders.size(), acceptTimeoutSeconds);
+
+                for (Order order : unrespondedOrders) {
+                    try {
+                        log.info("Auto-accepting order: orderId={}, driverId={}, assignedAt={}, age={}seconds",
+                                order.getId(),
+                                order.getDriver().getId(),
+                                order.getAssignedAt(),
+                                ChronoUnit.SECONDS.between(order.getAssignedAt(), Instant.now()));
+
+                        // Auto-accept the order using internal method
+                        orderService.internalAcceptOrderByDriver(order.getId(), order.getDriver().getId());
+                        
+                        log.info("✅ Auto-accepted order {} for driver {} due to timeout", 
+                                order.getId(), order.getDriver().getId());
+                    } catch (IdInvalidException e) {
+                        log.error("Failed to auto-accept order {}: {}", order.getId(), e.getMessage());
+                    }
+                }
+
+                log.info("Successfully processed {} unresponsive driver orders", unrespondedOrders.size());
+            }
+        } catch (Exception e) {
+            log.error("Error during auto-accept cleanup: {}", e.getMessage(), e);
+        }
+    }
 }

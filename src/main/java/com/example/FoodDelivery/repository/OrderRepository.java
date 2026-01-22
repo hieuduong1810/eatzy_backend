@@ -2,6 +2,8 @@ package com.example.FoodDelivery.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.example.FoodDelivery.domain.Order;
@@ -29,8 +31,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 
-    // Count how many times a customer has used a specific voucher
-    Long countByCustomerIdAndVoucherId(Long customerId, Long voucherId);
+    // Count how many times a customer has used a specific voucher (with
+    // many-to-many relationship)
+    @Query("SELECT COUNT(o) FROM Order o JOIN o.vouchers v WHERE o.customer.id = :customerId AND v.id = :voucherId")
+    Long countByCustomerIdAndVoucherId(@Param("customerId") Long customerId, @Param("voucherId") Long voucherId);
 
     List<Order> findByDriverIdOrderByCreatedAtDesc(Long driverId);
 
@@ -46,4 +50,7 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     // Count orders waiting for driver (status CONFIRMED or PREPARING with no
     // driver)
     long countByOrderStatusInAndDriverIsNull(java.util.List<String> statuses);
+
+    // Find orders that have been assigned to driver but not accepted yet and exceed timeout
+    List<Order> findByOrderStatusAndDriverIsNotNullAndAssignedAtBefore(String orderStatus, Instant assignedAt);
 }

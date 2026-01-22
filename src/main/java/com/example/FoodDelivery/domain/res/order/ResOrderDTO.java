@@ -18,7 +18,7 @@ public class ResOrderDTO {
     private Customer customer;
     private Restaurant restaurant;
     private Driver driver;
-    private Voucher voucher;
+    private List<Voucher> vouchers;
     private String orderStatus;
     private String deliveryAddress;
     private BigDecimal deliveryLatitude;

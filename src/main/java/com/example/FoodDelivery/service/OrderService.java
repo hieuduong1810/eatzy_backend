@@ -195,12 +195,18 @@ public class OrderService {
             dto.setDriver(driver);
         }
 
-        // Convert voucher
-        if (order.getVoucher() != null) {
-            ResOrderDTO.Voucher voucher = new ResOrderDTO.Voucher();
-            voucher.setId(order.getVoucher().getId());
-            voucher.setCode(order.getVoucher().getCode());
-            dto.setVoucher(voucher);
+        // Convert vouchers
+        List<Voucher> vouchers = order.getVouchers();
+        if (vouchers != null && !vouchers.isEmpty()) {
+            List<ResOrderDTO.Voucher> voucherDTOs = vouchers.stream()
+                    .map(v -> {
+                        ResOrderDTO.Voucher voucherDTO = new ResOrderDTO.Voucher();
+                        voucherDTO.setId(v.getId());
+                        voucherDTO.setCode(v.getCode());
+                        return voucherDTO;
+                    })
+                    .collect(Collectors.toList());
+            dto.setVouchers(voucherDTOs);
         }
 
         // Convert order items
@@ -362,9 +368,33 @@ public class OrderService {
     }
 
     /**
-     * Helper method to calculate voucher discount amount
+     * Helper method to calculate total discount from multiple vouchers
      */
-    private BigDecimal calculateVoucherDiscount(Voucher voucher, BigDecimal subtotal, BigDecimal deliveryFee) {
+    private BigDecimal calculateVouchersDiscount(List<Voucher> vouchers, BigDecimal subtotal, BigDecimal deliveryFee) {
+        if (vouchers == null || vouchers.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        BigDecimal remainingSubtotal = subtotal;
+
+        for (Voucher voucher : vouchers) {
+            BigDecimal discount = calculateSingleVoucherDiscount(voucher, remainingSubtotal, deliveryFee);
+            totalDiscount = totalDiscount.add(discount);
+            // For non-freeship vouchers, reduce the remaining subtotal for subsequent
+            // vouchers
+            if (!"FREESHIP".equals(voucher.getDiscountType())) {
+                remainingSubtotal = remainingSubtotal.subtract(discount);
+            }
+        }
+
+        return totalDiscount;
+    }
+
+    /**
+     * Helper method to calculate single voucher discount amount
+     */
+    private BigDecimal calculateSingleVoucherDiscount(Voucher voucher, BigDecimal subtotal, BigDecimal deliveryFee) {
         if (voucher == null) {
             return BigDecimal.ZERO;
         }
@@ -414,11 +444,10 @@ public class OrderService {
             log.info("Applied free shipping discount: {}", discountAmount);
         }
 
-        // Make sure discount doesn't exceed subtotal
-        if (discountAmount.compareTo(subtotal) > 0) {
+        // Make sure discount doesn't exceed subtotal (for non-freeship vouchers)
+        if (!"FREESHIP".equals(voucher.getDiscountType()) && discountAmount.compareTo(subtotal) > 0) {
             discountAmount = subtotal;
-            log.warn("Discount amount {} exceeds subtotal {}, capping at subtotal",
-                    discountAmount, subtotal);
+            log.warn("Discount amount exceeds subtotal, capping at subtotal: {}", subtotal);
         }
 
         return discountAmount;
@@ -560,14 +589,21 @@ public class OrderService {
             order.setDriver(driver);
         }
 
-        // Set voucher if provided
-        if (reqOrderDTO.getVoucher() != null && reqOrderDTO.getVoucher().getId() != null) {
-            Voucher voucher = this.voucherService.getVoucherById(reqOrderDTO.getVoucher().getId());
-
-            if (voucher == null) {
-                throw new IdInvalidException("Voucher not found with id: " + reqOrderDTO.getVoucher().getId());
+        // Set vouchers if provided
+        if (reqOrderDTO.getVouchers() != null && !reqOrderDTO.getVouchers().isEmpty()) {
+            List<Voucher> voucherList = new ArrayList<>();
+            for (ReqOrderDTO.Voucher reqVoucher : reqOrderDTO.getVouchers()) {
+                if (reqVoucher.getId() != null) {
+                    Voucher voucher = this.voucherService.getVoucherById(reqVoucher.getId());
+                    if (voucher == null) {
+                        throw new IdInvalidException("Voucher not found with id: " + reqVoucher.getId());
+                    }
+                    voucherList.add(voucher);
+                }
             }
-            order.setVoucher(voucher);
+            if (!voucherList.isEmpty()) {
+                order.setVouchers(voucherList);
+            }
         }
 
         // Set order fields
@@ -669,8 +705,10 @@ public class OrderService {
                 savedOrder.getDeliveryLongitude());
         savedOrder.setDeliveryFee(deliveryFee);
 
-        // Calculate voucher discount (including free shipping)
-        BigDecimal discountAmount = calculateVoucherDiscount(savedOrder.getVoucher(), subtotal, deliveryFee);
+        // Calculate vouchers discount (including free shipping) - supports multiple
+        // vouchers
+        List<Voucher> orderVouchers = savedOrder.getVouchers();
+        BigDecimal discountAmount = calculateVouchersDiscount(orderVouchers, subtotal, deliveryFee);
         savedOrder.setDiscountAmount(discountAmount);
 
         // Calculate total amount: subtotal + deliveryFee - discountAmount
@@ -876,6 +914,7 @@ public class OrderService {
         log.info("🎯 Assigned driver {} (ID: {}) to order {}", driver.getName(), driver.getId(), orderId);
 
         order.setDriver(driver);
+        order.setAssignedAt(Instant.now()); // Set assignedAt for timeout tracking
         order = orderRepository.save(order);
 
         // Convert to DTO for response
@@ -979,25 +1018,25 @@ public class OrderService {
     }
 
     // DRIVER ACTIONS
+    /**
+     * Internal method to accept order by driver without JWT authentication
+     * Used by both manual driver acceptance and auto-acceptance after timeout
+     */
     @Transactional
-    public ResOrderDTO acceptOrderByDriver(Long orderId) throws IdInvalidException {
+    public ResOrderDTO internalAcceptOrderByDriver(Long orderId, Long driverId) throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
             throw new IdInvalidException("Order not found with id: " + orderId);
         }
 
-        // Get current driver from JWT token
-        String currentUserEmail = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
-                .orElseThrow(() -> new IdInvalidException("User not authenticated"));
-
-        User driver = this.userService.handleGetUserByUsername(currentUserEmail);
+        User driver = this.userService.getUserById(driverId);
         if (driver == null) {
-            throw new IdInvalidException("Driver not found with email: " + currentUserEmail);
+            throw new IdInvalidException("Driver not found with id: " + driverId);
         }
 
         // Check if order has this driver assigned
         if (order.getDriver() == null || !order.getDriver().getId().equals(driver.getId())) {
-            throw new IdInvalidException("This order is not assigned to you");
+            throw new IdInvalidException("This order is not assigned to driver " + driverId);
         }
 
         if ("COD".equals(order.getPaymentMethod())) {
@@ -1009,8 +1048,9 @@ public class OrderService {
             }
         }
 
-        // Update status to DRIVER_ASSIGNED
+        // Update status to DRIVER_ASSIGNED and clear assignedAt
         order.setOrderStatus("DRIVER_ASSIGNED");
+        order.setAssignedAt(null); // Clear assignedAt after successful acceptance
         order = orderRepository.save(order);
 
         // Update driver profile status to UNAVAILABLE
@@ -1029,6 +1069,21 @@ public class OrderService {
         webSocketService.broadcastOrderStatusChange(orderDTO);
 
         return orderDTO;
+    }
+
+    @Transactional
+    public ResOrderDTO acceptOrderByDriver(Long orderId) throws IdInvalidException {
+        // Get current driver from JWT token
+        String currentUserEmail = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not authenticated"));
+
+        User driver = this.userService.handleGetUserByUsername(currentUserEmail);
+        if (driver == null) {
+            throw new IdInvalidException("Driver not found with email: " + currentUserEmail);
+        }
+
+        // Call internal method with driver ID
+        return internalAcceptOrderByDriver(orderId, driver.getId());
     }
 
     @Transactional
@@ -1142,16 +1197,19 @@ public class OrderService {
             if (closestDriver != null) {
                 // Assign to next driver and keep current status
                 order.setDriver(closestDriver.getUser());
+                order.setAssignedAt(Instant.now()); // Set assignedAt for new driver assignment
                 log.info("🎯 Reassigned to driver {}", closestDriver.getUser().getId());
             } else {
                 // Failed to calculate distance for all candidates
                 order.setDriver(null);
+                order.setAssignedAt(null);
                 log.warn("Failed to find closest driver for order {} - Mapbox distance calculation failed",
                         orderId);
             }
         } else {
             // No more available drivers, set driver to null and reset status
             order.setDriver(null);
+            order.setAssignedAt(null);
             log.warn("No qualified drivers found after validation");
         }
 

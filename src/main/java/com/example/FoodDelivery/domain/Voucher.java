@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "vouchers")
@@ -41,11 +41,13 @@ public class Voucher {
     private Instant endDate;
     private Integer totalQuantity;
 
-    @ManyToOne
-    @JoinColumn(name = "restaurant_id")
-    private Restaurant restaurant;
+    @ManyToMany
+    @JsonIgnoreProperties("vouchers")
+    @JoinTable(name = "voucher_restaurant", joinColumns = @JoinColumn(name = "voucher_id"), inverseJoinColumns = @JoinColumn(name = "restaurant_id"))
+    private List<Restaurant> restaurants;
 
-    @OneToMany(mappedBy = "voucher", fetch = FetchType.LAZY)
-    @JsonIgnore
+    @ManyToMany
+    @JsonIgnoreProperties("vouchers")
+    @JoinTable(name = "voucher_order", joinColumns = @JoinColumn(name = "voucher_id"), inverseJoinColumns = @JoinColumn(name = "order_id"))
     private List<Order> orders;
 }
