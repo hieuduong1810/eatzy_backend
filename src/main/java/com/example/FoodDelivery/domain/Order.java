@@ -32,8 +32,9 @@ public class Order {
     @JoinColumn(name = "driver_id")
     private User driver;
 
-    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "orders")
+    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JsonIgnore
+    @JoinTable(name = "voucher_order", joinColumns = @JoinColumn(name = "order_id"), inverseJoinColumns = @JoinColumn(name = "voucher_id"))
     private List<Voucher> vouchers;
 
     private String orderStatus;

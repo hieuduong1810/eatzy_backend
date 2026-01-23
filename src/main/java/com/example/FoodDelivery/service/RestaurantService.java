@@ -878,4 +878,26 @@ public class RestaurantService {
         Restaurant restaurant = getCurrentOwnerRestaurant();
         return convertToResRestaurantDTO(restaurant);
     }
+
+    /**
+     * Current owner opens their restaurant - set status to OPEN
+     * Gets restaurant from logged-in user's security context
+     */
+    public ResRestaurantDTO openCurrentRestaurant() throws IdInvalidException {
+        Restaurant restaurant = getCurrentOwnerRestaurant();
+        restaurant.setStatus("OPEN");
+        Restaurant savedRestaurant = restaurantRepository.save(restaurant);
+        return convertToResRestaurantDTO(savedRestaurant);
+    }
+
+    /**
+     * Current owner closes their restaurant - set status to CLOSED
+     * Gets restaurant from logged-in user's security context
+     */
+    public ResRestaurantDTO closeCurrentRestaurant() throws IdInvalidException {
+        Restaurant restaurant = getCurrentOwnerRestaurant();
+        restaurant.setStatus("CLOSED");
+        Restaurant savedRestaurant = restaurantRepository.save(restaurant);
+        return convertToResRestaurantDTO(savedRestaurant);
+    }
 }

@@ -53,10 +53,25 @@ public class FavoriteService {
             ResFavouriteDTO.Restaurant restaurantDTO = new ResFavouriteDTO.Restaurant();
             restaurantDTO.setId(favorite.getRestaurant().getId());
             restaurantDTO.setName(favorite.getRestaurant().getName());
+            restaurantDTO.setSlug(favorite.getRestaurant().getSlug());
             restaurantDTO.setAddress(favorite.getRestaurant().getAddress());
             restaurantDTO.setDescription(favorite.getRestaurant().getDescription());
             restaurantDTO.setAverageRating(favorite.getRestaurant().getAverageRating());
             restaurantDTO.setImageUrl(favorite.getRestaurant().getAvatarUrl());
+
+            // Map restaurantTypes
+            if (favorite.getRestaurant().getRestaurantTypes() != null) {
+                restaurantDTO.setRestaurantTypes(
+                        favorite.getRestaurant().getRestaurantTypes().stream()
+                                .map(type -> {
+                                    ResFavouriteDTO.RestaurantType typeDTO = new ResFavouriteDTO.RestaurantType();
+                                    typeDTO.setId(type.getId());
+                                    typeDTO.setName(type.getName());
+                                    return typeDTO;
+                                })
+                                .toList());
+            }
+
             dto.setRestaurant(restaurantDTO);
         }
 

@@ -1,6 +1,7 @@
 package com.example.FoodDelivery.domain.res.favourite;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,9 +33,20 @@ public class ResFavouriteDTO {
     public static class Restaurant {
         private Long id;
         private String name;
+        private String slug;
         private String address;
         private String description;
         private BigDecimal averageRating;
         private String imageUrl;
+        private List<RestaurantType> restaurantTypes;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RestaurantType {
+        private Long id;
+        private String name;
     }
 }
