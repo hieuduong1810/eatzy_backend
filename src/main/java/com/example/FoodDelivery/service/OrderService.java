@@ -159,6 +159,7 @@ public class OrderService {
             restaurant.setId(order.getRestaurant().getId());
             restaurant.setName(order.getRestaurant().getName());
             restaurant.setAddress(order.getRestaurant().getAddress());
+            restaurant.setImageUrl(order.getRestaurant().getAvatarUrl());
             dto.setRestaurant(restaurant);
         }
 
