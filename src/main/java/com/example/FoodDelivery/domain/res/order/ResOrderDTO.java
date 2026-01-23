@@ -66,6 +66,8 @@ public class ResOrderDTO {
         private String completedTrips;
         private String vehicleLicensePlate;
         private String phoneNumber;
+        private Double latitude;
+        private Double longitude;
     }
 
     @Getter
@@ -77,6 +79,8 @@ public class ResOrderDTO {
         private String name;
         private String address;
         private String imageUrl;
+        private BigDecimal latitude;
+        private BigDecimal longitude;
     }
 
     @Getter

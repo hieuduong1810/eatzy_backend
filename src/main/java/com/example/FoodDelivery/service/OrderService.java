@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -160,6 +161,8 @@ public class OrderService {
             restaurant.setName(order.getRestaurant().getName());
             restaurant.setAddress(order.getRestaurant().getAddress());
             restaurant.setImageUrl(order.getRestaurant().getAvatarUrl());
+            restaurant.setLatitude(order.getRestaurant().getLatitude());
+            restaurant.setLongitude(order.getRestaurant().getLongitude());
             dto.setRestaurant(restaurant);
         }
 
@@ -192,6 +195,11 @@ public class OrderService {
                                 : null);
                 driver.setVehicleLicensePlate(driverProfile.getVehicleLicensePlate());
                 driver.setVehicleDetails(driverProfile.getVehicleDetails());
+                org.springframework.data.geo.Point location = redisGeoService
+                        .getDriverLocation(order.getDriver().getId());
+                driver.setLatitude(location.getX());
+                driver.setLongitude(location.getY());
+
             }
 
             dto.setDriver(driver);
