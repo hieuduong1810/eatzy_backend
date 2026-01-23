@@ -332,8 +332,8 @@ public class PaymentService {
      */
     private User getAdminUser() {
         try {
-            // Get admin user by role name "ADMIN"
-            return userService.getUserByRoleName("ADMIN");
+            // Get admin user by email
+            return userService.handleGetUserByUsername("admin@gmail.com");
         } catch (Exception e) {
             log.error("Error getting admin user: {}", e.getMessage());
             return null;
