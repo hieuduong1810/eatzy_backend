@@ -3,6 +3,7 @@ package com.example.FoodDelivery.service;
 import java.math.BigDecimal;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,7 +22,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final UserService userService;
 
-    public WalletService(WalletRepository walletRepository, UserService userService) {
+    public WalletService(WalletRepository walletRepository, @Lazy UserService userService) {
         this.walletRepository = walletRepository;
         this.userService = userService;
     }
