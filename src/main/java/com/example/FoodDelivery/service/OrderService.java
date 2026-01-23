@@ -942,7 +942,7 @@ public class OrderService {
             throw new IdInvalidException("Order not found with id: " + orderId);
         }
 
-        if (!"PENDING".equals(order.getOrderStatus()) || !"PREPARING".equals(order.getOrderStatus())) {
+        if (!"PENDING".equals(order.getOrderStatus()) && !"PREPARING".equals(order.getOrderStatus())) {
             throw new IdInvalidException(
                     "Can only reject orders with PENDING or PREPARING status. Current status: "
                             + order.getOrderStatus());
