@@ -11,6 +11,9 @@ import com.example.FoodDelivery.domain.Order;
 import com.example.FoodDelivery.service.OrderService;
 import com.example.FoodDelivery.service.PaymentService;
 import com.example.FoodDelivery.service.VNPayService;
+import com.example.FoodDelivery.util.SecurityUtil;
+import com.example.FoodDelivery.service.UserService;
+import com.example.FoodDelivery.service.WalletTransactionService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -22,11 +25,20 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final VNPayService vnPayService;
     private final OrderService orderService;
+    private final UserService userService;
+    private final WalletTransactionService walletTransactionService;
 
-    public PaymentController(PaymentService paymentService, VNPayService vnPayService, OrderService orderService) {
+    public PaymentController(
+            PaymentService paymentService,
+            VNPayService vnPayService,
+            OrderService orderService,
+            UserService userService,
+            WalletTransactionService walletTransactionService) {
         this.paymentService = paymentService;
         this.vnPayService = vnPayService;
         this.orderService = orderService;
+        this.userService = userService;
+        this.walletTransactionService = walletTransactionService;
     }
 
     /**
@@ -109,11 +121,20 @@ public class PaymentController {
             @RequestBody Map<String, Object> body,
             HttpServletRequest request) throws IdInvalidException, UnsupportedEncodingException {
 
-        if (!body.containsKey("userId") || !body.containsKey("amount")) {
-            throw new IdInvalidException("User ID and amount are required");
+        if (!body.containsKey("amount")) {
+            throw new IdInvalidException("Amount is required");
         }
 
-        Long userId = ((Number) body.get("userId")).longValue();
+        // Get current logged-in user
+        String email = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not logged in"));
+
+        com.example.FoodDelivery.domain.User user = userService.handleGetUserByUsername(email);
+        if (user == null) {
+            throw new IdInvalidException("User not found");
+        }
+
+        Long userId = user.getId();
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
 
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -274,5 +295,45 @@ public class PaymentController {
 
         Map<String, BigDecimal> commissions = paymentService.calculateCommissions(order);
         return ResponseEntity.ok(commissions);
+    }
+
+    /**
+     * Process wallet withdrawal
+     */
+    @PostMapping("/withdraw")
+    @ApiMessage("Process wallet withdrawal")
+    public ResponseEntity<Map<String, Object>> withdraw(
+            @RequestBody Map<String, Object> body) throws IdInvalidException {
+
+        if (!body.containsKey("amount")) {
+            throw new IdInvalidException("Amount is required");
+        }
+
+        BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        String description = (String) body.get("description");
+
+        // Get current logged-in user
+        String email = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not logged in"));
+
+        com.example.FoodDelivery.domain.User user = userService.handleGetUserByUsername(email);
+        if (user == null) {
+            throw new IdInvalidException("User not found");
+        }
+
+        // Get user's wallet
+        // We reuse the logic but need to get the walletId
+        com.example.FoodDelivery.domain.Wallet wallet = user.getWallet();
+        if (wallet == null) {
+            throw new IdInvalidException("Wallet not found for current user");
+        }
+
+        com.example.FoodDelivery.domain.res.walletTransaction.resWalletTransactionDTO transaction = walletTransactionService
+                .withdrawFromWallet(wallet.getId(), amount, description);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Withdrawal successful",
+                "transaction", transaction));
     }
 }
