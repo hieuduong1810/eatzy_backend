@@ -787,8 +787,17 @@ public class OrderService {
                 savedOrder.getDeliveryLatitude(),
                 savedOrder.getDeliveryLongitude());
 
-        // Validate delivery fee from request matches calculated fee
-        if (reqOrderDTO.getDeliveryFee() != null) {
+        // Check if order has a FREESHIP voucher
+        boolean hasFreeshipVoucher = false;
+        List<Voucher> orderVouchers = savedOrder.getVouchers();
+        if (orderVouchers != null) {
+            hasFreeshipVoucher = orderVouchers.stream()
+                    .anyMatch(v -> "FREESHIP".equals(v.getDiscountType()));
+        }
+
+        // Validate delivery fee from request matches calculated fee (skip if FREESHIP
+        // voucher applied)
+        if (reqOrderDTO.getDeliveryFee() != null && !hasFreeshipVoucher) {
             // Compare with tolerance for rounding differences (1 VND)
             BigDecimal clientDeliveryFee = reqOrderDTO.getDeliveryFee().setScale(0, java.math.RoundingMode.HALF_UP);
             BigDecimal serverDeliveryFee = deliveryFee.setScale(0, java.math.RoundingMode.HALF_UP);
@@ -805,7 +814,7 @@ public class OrderService {
 
         // Calculate vouchers discount (including free shipping) - supports multiple
         // vouchers
-        List<Voucher> orderVouchers = savedOrder.getVouchers();
+        // (orderVouchers already fetched above for FREESHIP check)
         BigDecimal discountAmount = calculateVouchersDiscount(orderVouchers, subtotal, deliveryFee);
         savedOrder.setDiscountAmount(discountAmount);
 
