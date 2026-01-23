@@ -917,6 +917,14 @@ public class OrderService {
         order.setAssignedAt(Instant.now()); // Set assignedAt for timeout tracking
         order = orderRepository.save(order);
 
+        // Set driver status to UNAVAILABLE after assignment
+        try {
+            driverProfileService.updateDriverProfileStatusByUserId(driver.getId(), "UNAVAILABLE");
+            log.info("🔴 Set driver {} status to UNAVAILABLE after assignment", driver.getId());
+        } catch (Exception e) {
+            log.error("Failed to update driver {} profile status to UNAVAILABLE: {}", driver.getId(), e.getMessage());
+        }
+
         // Convert to DTO for response
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
@@ -934,9 +942,10 @@ public class OrderService {
             throw new IdInvalidException("Order not found with id: " + orderId);
         }
 
-        if (!"PENDING".equals(order.getOrderStatus())) {
+        if (!"PENDING".equals(order.getOrderStatus()) || !"PREPARING".equals(order.getOrderStatus())) {
             throw new IdInvalidException(
-                    "Can only reject orders with PENDING status. Current status: " + order.getOrderStatus());
+                    "Can only reject orders with PENDING or PREPARING status. Current status: "
+                            + order.getOrderStatus());
         }
 
         order.setOrderStatus("REJECTED");
@@ -1088,14 +1097,6 @@ public class OrderService {
         order.setAssignedAt(null); // Clear assignedAt after successful acceptance
         order = orderRepository.save(order);
 
-        // Update driver profile status to UNAVAILABLE
-        try {
-            driverProfileService.updateDriverProfileStatusByUserId(driver.getId(), "UNAVAILABLE");
-            log.info("Updated driver {} profile status to UNAVAILABLE", driver.getId());
-        } catch (Exception e) {
-            log.error("Failed to update driver profile status: {}", e.getMessage());
-        }
-
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
         // Notify customer and restaurant about driver acceptance
@@ -1122,7 +1123,7 @@ public class OrderService {
     }
 
     @Transactional
-    public ResOrderDTO rejectOrderByDriver(Long orderId, String rejectionReason)
+    public ResOrderDTO rejectOrderByDriver(Long orderId)
             throws IdInvalidException {
         Order order = getOrderById(orderId);
         if (order == null) {
@@ -1146,8 +1147,16 @@ public class OrderService {
         // Save rejection to Redis using RedisRejectionService
         redisRejectionService.addRejectedDriver(orderId, driver.getId());
 
-        log.info("💾 Saved driver {} rejection for order {} to Redis (reason: {})",
-                driver.getId(), orderId, rejectionReason);
+        // Set the rejecting driver's status back to AVAILABLE
+        try {
+            driverProfileService.updateDriverProfileStatusByUserId(driver.getId(), "AVAILABLE");
+            log.info("🟢 Set driver {} status to AVAILABLE after rejecting order {}", driver.getId(), orderId);
+        } catch (Exception e) {
+            log.error("Failed to update driver {} profile status to AVAILABLE: {}", driver.getId(), e.getMessage());
+        }
+
+        log.info("💾 Saved driver {} rejection for order {} to Redis",
+                driver.getId(), orderId);
 
         // Get list of all rejected driver IDs for this order from Redis
         List<Long> rejectedDriverIds = redisRejectionService.getRejectedDriverIds(orderId);
@@ -1234,6 +1243,17 @@ public class OrderService {
                 order.setDriver(closestDriver.getUser());
                 order.setAssignedAt(Instant.now()); // Set assignedAt for new driver assignment
                 log.info("🎯 Reassigned to driver {}", closestDriver.getUser().getId());
+
+                // Set the new driver's status to UNAVAILABLE
+                try {
+                    driverProfileService.updateDriverProfileStatusByUserId(closestDriver.getUser().getId(),
+                            "UNAVAILABLE");
+                    log.info("🔴 Set driver {} status to UNAVAILABLE after reassignment",
+                            closestDriver.getUser().getId());
+                } catch (Exception e) {
+                    log.error("Failed to update driver {} profile status to UNAVAILABLE: {}",
+                            closestDriver.getUser().getId(), e.getMessage());
+                }
             } else {
                 // Failed to calculate distance for all candidates
                 order.setDriver(null);

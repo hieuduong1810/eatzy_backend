@@ -444,6 +444,11 @@ public class DriverProfileService {
                     order.setDriver(driver);
                     Order updatedOrder = orderRepository.save(order);
 
+                    // Set driver status to UNAVAILABLE after being assigned
+                    driverProfile.setStatus("UNAVAILABLE");
+                    driverProfileRepository.save(driverProfile);
+                    log.info("🔴 Set driver {} status to UNAVAILABLE after order assignment", driver.getId());
+
                     // Convert to DTO for WebSocket notification
                     ResOrderDTO orderDTO = orderService.convertToResOrderDTO(updatedOrder);
 

@@ -275,13 +275,8 @@ public class OrderController {
     @PatchMapping("/orders/{id}/driver/reject")
     @ApiMessage("Driver rejects order")
     public ResponseEntity<ResOrderDTO> rejectOrderByDriver(
-            @PathVariable("id") Long orderId,
-            @RequestBody Map<String, String> body) throws IdInvalidException {
-        String rejectionReason = body.get("rejectionReason");
-        if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
-            throw new IdInvalidException("Rejection reason is required");
-        }
-        ResOrderDTO order = orderService.rejectOrderByDriver(orderId, rejectionReason);
+            @PathVariable("id") Long orderId) throws IdInvalidException {
+        ResOrderDTO order = orderService.rejectOrderByDriver(orderId);
         return ResponseEntity.ok(order);
     }
 
