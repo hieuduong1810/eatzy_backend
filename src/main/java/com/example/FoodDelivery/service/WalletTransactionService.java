@@ -333,6 +333,31 @@ public class WalletTransactionService {
         }
     }
 
+    public ResultPaginationDTO getWalletTransactionsByWalletIdWithSpec(Long walletId,
+            Specification<WalletTransaction> spec, Pageable pageable) {
+        // Combine base filter (walletId) with additional spec from @Filter
+        Specification<WalletTransaction> baseSpec = (root, query, cb) -> cb.equal(root.get("wallet").get("id"),
+                walletId);
+        Specification<WalletTransaction> combinedSpec = spec != null ? baseSpec.and(spec) : baseSpec;
+
+        Page<WalletTransaction> page = this.walletTransactionRepository.findAll(combinedSpec, pageable);
+
+        List<resWalletTransactionDTO> dtoList = page.getContent()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(page.getTotalElements());
+        meta.setPages(page.getTotalPages());
+        result.setMeta(meta);
+        result.setResult(dtoList);
+        return result;
+    }
+
     public ResultPaginationDTO getAllWalletTransactions(Specification<WalletTransaction> spec, Pageable pageable) {
         Page<WalletTransaction> page = this.walletTransactionRepository.findAll(spec, pageable);
 

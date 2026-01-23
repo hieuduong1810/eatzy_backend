@@ -148,7 +148,8 @@ public class WalletTransactionController {
 
     @GetMapping("/wallet-transactions/my-transactions")
     @ApiMessage("Get wallet transactions for current logged-in user")
-    public ResponseEntity<List<resWalletTransactionDTO>> getMyWalletTransactions() throws IdInvalidException {
+    public ResponseEntity<ResultPaginationDTO> getMyWalletTransactions(
+            @Filter Specification<WalletTransaction> spec, Pageable pageable) throws IdInvalidException {
         // Get current user's email from security context
         String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new IdInvalidException("User is not logged in"));
@@ -165,10 +166,10 @@ public class WalletTransactionController {
             throw new IdInvalidException("Wallet not found for user: " + currentUser.getName());
         }
 
-        // Get transactions for wallet
-        List<resWalletTransactionDTO> transactions = walletTransactionService
-                .getWalletTransactionsByWalletId(wallet.getId());
-        return ResponseEntity.ok(transactions);
+        // Get transactions for wallet with filter and pagination
+        ResultPaginationDTO result = walletTransactionService
+                .getWalletTransactionsByWalletIdWithSpec(wallet.getId(), spec, pageable);
+        return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/wallet-transactions/{id}")
