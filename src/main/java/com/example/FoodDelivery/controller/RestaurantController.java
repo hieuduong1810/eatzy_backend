@@ -172,4 +172,13 @@ public class RestaurantController {
         ResRestaurantDTO restaurant = restaurantService.closeCurrentRestaurant();
         return ResponseEntity.ok(restaurant);
     }
+
+    @GetMapping("/restaurants/my-restaurant/status")
+    @ApiMessage("Get current owner's restaurant status")
+    public ResponseEntity<java.util.Map<String, String>> getMyRestaurantStatus() throws IdInvalidException {
+        Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("status", restaurant.getStatus());
+        return ResponseEntity.ok(response);
+    }
 }

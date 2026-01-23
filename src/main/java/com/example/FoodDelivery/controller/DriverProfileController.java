@@ -111,6 +111,15 @@ public class DriverProfileController {
         return ResponseEntity.ok(profile);
     }
 
+    @GetMapping("/driver-profiles/my-profile/status")
+    @ApiMessage("Get current driver's profile status")
+    public ResponseEntity<java.util.Map<String, String>> getMyProfileStatus() throws IdInvalidException {
+        com.example.FoodDelivery.domain.DriverProfile profile = driverProfileService.getCurrentDriverProfile();
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("status", profile.getStatus());
+        return ResponseEntity.ok(response);
+    }
+
     // @GetMapping("/driver-profiles/available-by-cod-limit")
     // @ApiMessage("Get first available driver by COD limit")
     // public ResponseEntity<ResDriverProfileDTO> getFirstAvailableDriverByCodLimit(
