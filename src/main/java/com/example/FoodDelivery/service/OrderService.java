@@ -197,8 +197,10 @@ public class OrderService {
                 driver.setVehicleDetails(driverProfile.getVehicleDetails());
                 org.springframework.data.geo.Point location = redisGeoService
                         .getDriverLocation(order.getDriver().getId());
-                driver.setLatitude(location.getX());
-                driver.setLongitude(location.getY());
+                if (location != null) {
+                    driver.setLatitude(location.getX());
+                    driver.setLongitude(location.getY());
+                }
 
             }
 
