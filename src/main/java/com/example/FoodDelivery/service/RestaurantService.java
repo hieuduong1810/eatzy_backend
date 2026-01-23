@@ -212,6 +212,7 @@ public class RestaurantService {
         dto.setSlug(restaurant.getSlug());
         dto.setAddress(restaurant.getAddress());
         dto.setDescription(restaurant.getDescription());
+        dto.setAvatarUrl(restaurant.getAvatarUrl());
         dto.setOneStarCount(restaurant.getOneStarCount());
         dto.setTwoStarCount(restaurant.getTwoStarCount());
         dto.setThreeStarCount(restaurant.getThreeStarCount());

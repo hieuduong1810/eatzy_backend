@@ -17,6 +17,7 @@ public class ResRestaurantMagazineDTO {
     private String slug;
     private String address;
     private String description;
+    private String avatarUrl;
     private Integer oneStarCount;
     private Integer twoStarCount;
     private Integer threeStarCount;
@@ -25,13 +26,13 @@ public class ResRestaurantMagazineDTO {
     private BigDecimal averageRating;
     private BigDecimal distance;
     private List<Category> category;
-    
+
     // Personalized ranking scores (optional - only set if user is logged in)
-    private Double typeScore;        // S_Type (40%)
-    private Double loyaltyScore;     // S_Quen (30%)
-    private Double distanceScore;    // S_Gần (20%)
-    private Double qualityScore;     // S_Ngon (10%)
-    private Double finalScore;       // Total weighted score
+    private Double typeScore; // S_Type (40%)
+    private Double loyaltyScore; // S_Quen (30%)
+    private Double distanceScore; // S_Gần (20%)
+    private Double qualityScore; // S_Ngon (10%)
+    private Double finalScore; // Total weighted score
 
     @Getter
     @Setter
