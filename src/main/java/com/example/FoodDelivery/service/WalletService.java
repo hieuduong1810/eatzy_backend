@@ -12,15 +12,62 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.Wallet;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.wallet.resWalletDTO;
 import com.example.FoodDelivery.repository.WalletRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
 @Service
 public class WalletService {
     private final WalletRepository walletRepository;
+    private final UserService userService;
 
-    public WalletService(WalletRepository walletRepository) {
+    public WalletService(WalletRepository walletRepository, UserService userService) {
         this.walletRepository = walletRepository;
+        this.userService = userService;
+    }
+
+    private resWalletDTO convertToDTO(Wallet wallet) {
+        if (wallet == null) {
+            return null;
+        }
+        resWalletDTO dto = new resWalletDTO();
+        dto.setId(wallet.getId());
+        dto.setBalance(wallet.getBalance());
+
+        if (wallet.getUser() != null) {
+            resWalletDTO.User userDTO = new resWalletDTO.User();
+            userDTO.setId(wallet.getUser().getId());
+            userDTO.setName(wallet.getUser().getName());
+            userDTO.setEmail(wallet.getUser().getEmail());
+            dto.setUser(userDTO);
+        }
+
+        return dto;
+    }
+
+    public resWalletDTO getMyWallet() throws IdInvalidException {
+        String currentUserEmail = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not authenticated"));
+
+        User user = this.userService.handleGetUserByUsername(currentUserEmail);
+        if (user == null) {
+            throw new IdInvalidException("User not found with email: " + currentUserEmail);
+        }
+
+        Wallet wallet = getWalletByUserId(user.getId());
+        if (wallet == null) {
+            throw new IdInvalidException("Wallet not found for current user");
+        }
+
+        return convertToDTO(wallet);
+    }
+
+    public resWalletDTO getWalletDTOByUserId(Long userId) throws IdInvalidException {
+        Wallet wallet = getWalletByUserId(userId);
+        if (wallet == null) {
+            throw new IdInvalidException("Wallet not found for user id: " + userId);
+        }
+        return convertToDTO(wallet);
     }
 
     public boolean existsByUserId(Long userId) {

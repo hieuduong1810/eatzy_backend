@@ -7,6 +7,7 @@ import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Wallet;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.wallet.resWalletDTO;
 import com.example.FoodDelivery.service.WalletService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
@@ -71,13 +72,18 @@ public class WalletController {
         return ResponseEntity.ok(wallet);
     }
 
+    @GetMapping("/wallets/my-wallet")
+    @ApiMessage("Get current user's wallet")
+    public ResponseEntity<resWalletDTO> getMyWallet() throws IdInvalidException {
+        resWalletDTO wallet = walletService.getMyWallet();
+        return ResponseEntity.ok(wallet);
+    }
+
     @GetMapping("/wallets/user/{userId}")
     @ApiMessage("Get wallet by user id")
-    public ResponseEntity<Wallet> getWalletByUserId(@PathVariable("userId") Long userId) throws IdInvalidException {
-        Wallet wallet = walletService.getWalletByUserId(userId);
-        if (wallet == null) {
-            throw new IdInvalidException("Wallet not found for user id: " + userId);
-        }
+    public ResponseEntity<resWalletDTO> getWalletByUserId(@PathVariable("userId") Long userId)
+            throws IdInvalidException {
+        resWalletDTO wallet = walletService.getWalletDTOByUserId(userId);
         return ResponseEntity.ok(wallet);
     }
 }
