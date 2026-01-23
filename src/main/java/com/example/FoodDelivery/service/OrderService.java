@@ -637,7 +637,7 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResOrderDTO createOrderFromReqDTO(ReqOrderDTO reqOrderDTO, String clientIp, String baseUrl)
             throws IdInvalidException {
         // Create Order entity
@@ -692,20 +692,50 @@ public class OrderService {
         // Set order fields
         order.setOrderStatus(reqOrderDTO.getOrderStatus() != null ? reqOrderDTO.getOrderStatus() : "PENDING");
         order.setDeliveryAddress(reqOrderDTO.getDeliveryAddress());
-        order.setDeliveryLatitude(reqOrderDTO.getDeliveryLatitude() != null
+        BigDecimal deliveryLatitude = reqOrderDTO.getDeliveryLatitude() != null
                 ? BigDecimal.valueOf(reqOrderDTO.getDeliveryLatitude())
-                : null);
-        order.setDeliveryLongitude(reqOrderDTO.getDeliveryLongitude() != null
+                : null;
+        BigDecimal deliveryLongitude = reqOrderDTO.getDeliveryLongitude() != null
                 ? BigDecimal.valueOf(reqOrderDTO.getDeliveryLongitude())
-                : null);
+                : null;
+        order.setDeliveryLatitude(deliveryLatitude);
+        order.setDeliveryLongitude(deliveryLongitude);
         order.setSpecialInstructions(reqOrderDTO.getSpecialInstructions());
         order.setSubtotal(reqOrderDTO.getSubtotal());
-        // Delivery fee will be calculated based on distance and system configuration
         order.setPaymentMethod(reqOrderDTO.getPaymentMethod());
         order.setPaymentStatus(reqOrderDTO.getPaymentStatus() != null ? reqOrderDTO.getPaymentStatus() : "UNPAID");
         order.setCreatedAt(Instant.now());
 
-        // Save order first
+        // ===== VALIDATE DELIVERY FEE BEFORE SAVING ORDER =====
+        // Calculate delivery fee based on real driving distance
+        BigDecimal deliveryFee = calculateDeliveryFee(restaurant, deliveryLatitude, deliveryLongitude);
+
+        // Check if order has a FREESHIP voucher
+        boolean hasFreeshipVoucher = false;
+        List<Voucher> orderVouchers = order.getVouchers();
+        if (orderVouchers != null) {
+            hasFreeshipVoucher = orderVouchers.stream()
+                    .anyMatch(v -> "FREESHIP".equals(v.getDiscountType()));
+        }
+
+        // Validate delivery fee from request matches calculated fee (skip if FREESHIP
+        // voucher applied)
+        if (reqOrderDTO.getDeliveryFee() != null && !hasFreeshipVoucher) {
+            // Compare with tolerance for rounding differences (1 VND)
+            BigDecimal clientDeliveryFee = reqOrderDTO.getDeliveryFee().setScale(0, java.math.RoundingMode.HALF_UP);
+            BigDecimal serverDeliveryFee = deliveryFee.setScale(0, java.math.RoundingMode.HALF_UP);
+
+            if (clientDeliveryFee.compareTo(serverDeliveryFee) != 0) {
+                log.warn("Delivery fee mismatch - Client: {}, Server: {}", clientDeliveryFee, serverDeliveryFee);
+                throw new IdInvalidException(
+                        "Phí giao hàng đã thay đổi. Vui lòng tải lại trang để cập nhật giá mới. " +
+                                "(Giá cũ: " + clientDeliveryFee + " VND, Giá mới: " + serverDeliveryFee + " VND)");
+            }
+        }
+        order.setDeliveryFee(deliveryFee);
+        // ===== END VALIDATE DELIVERY FEE =====
+
+        // Save order first (now after all validations pass)
         Order savedOrder = orderRepository.save(order);
 
         // Create order items with options
@@ -780,41 +810,11 @@ public class OrderService {
             savedOrder.setOrderItems(orderItems);
         }
 
-        // Calculate delivery fee based on real driving distance
+        // Update subtotal with calculated value from order items
         savedOrder.setSubtotal(subtotal);
-        BigDecimal deliveryFee = calculateDeliveryFee(
-                restaurant,
-                savedOrder.getDeliveryLatitude(),
-                savedOrder.getDeliveryLongitude());
-
-        // Check if order has a FREESHIP voucher
-        boolean hasFreeshipVoucher = false;
-        List<Voucher> orderVouchers = savedOrder.getVouchers();
-        if (orderVouchers != null) {
-            hasFreeshipVoucher = orderVouchers.stream()
-                    .anyMatch(v -> "FREESHIP".equals(v.getDiscountType()));
-        }
-
-        // Validate delivery fee from request matches calculated fee (skip if FREESHIP
-        // voucher applied)
-        if (reqOrderDTO.getDeliveryFee() != null && !hasFreeshipVoucher) {
-            // Compare with tolerance for rounding differences (1 VND)
-            BigDecimal clientDeliveryFee = reqOrderDTO.getDeliveryFee().setScale(0, java.math.RoundingMode.HALF_UP);
-            BigDecimal serverDeliveryFee = deliveryFee.setScale(0, java.math.RoundingMode.HALF_UP);
-
-            if (clientDeliveryFee.compareTo(serverDeliveryFee) != 0) {
-                log.warn("Delivery fee mismatch - Client: {}, Server: {}", clientDeliveryFee, serverDeliveryFee);
-                throw new IdInvalidException(
-                        "Phí giao hàng đã thay đổi. Vui lòng tải lại trang để cập nhật giá mới. " +
-                                "(Giá cũ: " + clientDeliveryFee + " VND, Giá mới: " + serverDeliveryFee + " VND)");
-            }
-        }
-
-        savedOrder.setDeliveryFee(deliveryFee);
 
         // Calculate vouchers discount (including free shipping) - supports multiple
         // vouchers
-        // (orderVouchers already fetched above for FREESHIP check)
         BigDecimal discountAmount = calculateVouchersDiscount(orderVouchers, subtotal, deliveryFee);
         savedOrder.setDiscountAmount(discountAmount);
 
