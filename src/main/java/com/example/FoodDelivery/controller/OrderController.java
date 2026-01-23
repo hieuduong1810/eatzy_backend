@@ -66,7 +66,35 @@ public class OrderController {
      * Hardcoded for localhost testing
      */
     private String getBaseUrl(HttpServletRequest request) {
-        return "http://localhost:8080";
+        // Priority 1: Check X-Forwarded headers from reverse proxy (nginx)
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        String forwardedHost = request.getHeader("X-Forwarded-Host");
+
+        if (forwardedProto != null && forwardedHost != null) {
+            // Production: nginx reverse proxy with domain and SSL
+            return forwardedProto + "://" + forwardedHost;
+        }
+
+        // Priority 2: Use Host header with X-Forwarded-Proto if available
+        String hostHeader = request.getHeader("Host");
+        if (hostHeader != null) {
+            // If X-Forwarded-Proto exists, use it (HTTPS from nginx)
+            String scheme = forwardedProto != null ? forwardedProto : request.getScheme();
+            return scheme + "://" + hostHeader;
+        }
+
+        // Priority 3: Fallback - construct from request
+        String scheme = forwardedProto != null ? forwardedProto : request.getScheme();
+        String serverName = request.getServerName();
+        int serverPort = request.getServerPort();
+
+        String baseUrl = scheme + "://" + serverName;
+        // Only add port if non-standard
+        if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
+            baseUrl += ":" + serverPort;
+        }
+
+        return baseUrl;
     }
 
     /**
@@ -74,7 +102,18 @@ public class OrderController {
      * Hardcoded for localhost testing
      */
     private String getClientIp(HttpServletRequest request) {
-        return "127.0.0.1";
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // If multiple IPs in X-Forwarded-For, take the first one
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip != null ? ip : "127.0.0.1";
     }
 
     @PutMapping("/orders")
