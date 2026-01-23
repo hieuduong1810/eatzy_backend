@@ -108,4 +108,11 @@ public class VoucherController {
         voucherService.deleteVoucher(id);
         return ResponseEntity.ok().body(null);
     }
+
+    @PutMapping("/vouchers/{id}/toggle")
+    @ApiMessage("Toggle voucher active status")
+    public ResponseEntity<resVoucherDTO> toggleVoucherActive(@PathVariable("id") Long id) throws IdInvalidException {
+        resVoucherDTO voucher = voucherService.toggleVoucherActive(id);
+        return ResponseEntity.ok(voucher);
+    }
 }

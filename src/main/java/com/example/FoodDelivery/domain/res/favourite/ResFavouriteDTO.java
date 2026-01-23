@@ -35,5 +35,6 @@ public class ResFavouriteDTO {
         private String address;
         private String description;
         private BigDecimal averageRating;
+        private String imageUrl;
     }
 }

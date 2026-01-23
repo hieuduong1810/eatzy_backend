@@ -40,6 +40,10 @@ public class Voucher {
     private Instant startDate;
     private Instant endDate;
     private Integer totalQuantity;
+    private Integer remainingQuantity;
+
+    @Column(name = "active")
+    private Boolean active = true;
 
     @ManyToMany
     @JsonIgnoreProperties("vouchers")

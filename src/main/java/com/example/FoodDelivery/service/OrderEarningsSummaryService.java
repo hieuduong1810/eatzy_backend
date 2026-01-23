@@ -216,16 +216,16 @@ public class OrderEarningsSummaryService {
 
         summary = orderEarningsSummaryRepository.save(summary);
 
-        // Decrement voucher totalQuantity for all vouchers that were applied
+        // Decrement voucher remainingQuantity for all vouchers that were applied
         List<Voucher> vouchers = order.getVouchers();
         if (vouchers != null && !vouchers.isEmpty() && platformVoucherCost != null
                 && platformVoucherCost.compareTo(BigDecimal.ZERO) > 0) {
             for (Voucher voucher : vouchers) {
-                if (voucher.getTotalQuantity() != null && voucher.getTotalQuantity() > 0) {
-                    voucher.setTotalQuantity(voucher.getTotalQuantity() - 1);
+                if (voucher.getRemainingQuantity() != null && voucher.getRemainingQuantity() > 0) {
+                    voucher.setRemainingQuantity(voucher.getRemainingQuantity() - 1);
                     voucherRepository.save(voucher);
                     log.info("Áp dụng voucher {} - Số lượng còn lại: {}", voucher.getCode(),
-                            voucher.getTotalQuantity());
+                            voucher.getRemainingQuantity());
                 }
             }
         }

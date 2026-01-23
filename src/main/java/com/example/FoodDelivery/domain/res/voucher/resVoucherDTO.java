@@ -24,6 +24,9 @@ public class resVoucherDTO {
     private Instant startDate;
     private Instant endDate;
     private Integer totalQuantity;
+    private Integer remainingQuantity;
+    private Boolean active;
+    private Integer remainingUsage;
     private String creatorType;
     private List<Restaurant> restaurants;
 

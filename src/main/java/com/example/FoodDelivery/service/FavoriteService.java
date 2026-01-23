@@ -56,6 +56,7 @@ public class FavoriteService {
             restaurantDTO.setAddress(favorite.getRestaurant().getAddress());
             restaurantDTO.setDescription(favorite.getRestaurant().getDescription());
             restaurantDTO.setAverageRating(favorite.getRestaurant().getAverageRating());
+            restaurantDTO.setImageUrl(favorite.getRestaurant().getAvatarUrl());
             dto.setRestaurant(restaurantDTO);
         }
 

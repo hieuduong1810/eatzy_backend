@@ -51,6 +51,14 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     // driver)
     long countByOrderStatusInAndDriverIsNull(java.util.List<String> statuses);
 
-    // Find orders that have been assigned to driver but not accepted yet and exceed timeout
+    // Find orders that have been assigned to driver but not accepted yet and exceed
+    // timeout
     List<Order> findByOrderStatusAndDriverIsNotNullAndAssignedAtBefore(String orderStatus, Instant assignedAt);
+
+    // Report queries
+    List<Order> findByRestaurantIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+            Long restaurantId, Instant startDate, Instant endDate);
+
+    Long countByRestaurantIdAndOrderStatusAndCreatedAtBetween(
+            Long restaurantId, String status, Instant startDate, Instant endDate);
 }

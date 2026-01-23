@@ -20,6 +20,8 @@ import com.example.FoodDelivery.domain.res.voucher.resVoucherDTO;
 import com.example.FoodDelivery.repository.VoucherRepository;
 import com.example.FoodDelivery.repository.OrderRepository;
 import com.example.FoodDelivery.repository.RestaurantRepository;
+import com.example.FoodDelivery.repository.UserRepository;
+import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
 import java.math.BigDecimal;
@@ -30,15 +32,21 @@ public class VoucherService {
     private final VoucherRepository voucherRepository;
     private final OrderRepository orderRepository;
     private final RestaurantRepository restaurantRepository;
+    private final UserRepository userRepository;
 
     public VoucherService(VoucherRepository voucherRepository, OrderRepository orderRepository,
-            RestaurantRepository restaurantRepository) {
+            RestaurantRepository restaurantRepository, UserRepository userRepository) {
         this.voucherRepository = voucherRepository;
         this.orderRepository = orderRepository;
         this.restaurantRepository = restaurantRepository;
+        this.userRepository = userRepository;
     }
 
     public resVoucherDTO convertToResVoucherDTO(Voucher voucher) {
+        return convertToResVoucherDTO(voucher, null);
+    }
+
+    public resVoucherDTO convertToResVoucherDTO(Voucher voucher, Long userId) {
         if (voucher == null) {
             return null;
         }
@@ -54,6 +62,32 @@ public class VoucherService {
         dto.setStartDate(voucher.getStartDate());
         dto.setEndDate(voucher.getEndDate());
         dto.setTotalQuantity(voucher.getTotalQuantity());
+        dto.setRemainingQuantity(voucher.getRemainingQuantity());
+        dto.setActive(voucher.getActive());
+
+        // Calculate remaining usage for current user
+        if (userId != null && voucher.getUsageLimitPerUser() != null) {
+            Long usageCount = this.orderRepository.countByCustomerIdAndVoucherId(userId, voucher.getId());
+            int remaining = voucher.getUsageLimitPerUser() - usageCount.intValue();
+            dto.setRemainingUsage(Math.max(0, remaining));
+        } else if (voucher.getUsageLimitPerUser() != null) {
+            // If no userId provided, try to get current user
+            String email = SecurityUtil.getCurrentUserLogin().orElse(null);
+            if (email != null) {
+                User user = this.userRepository.findByEmail(email);
+                if (user != null) {
+                    Long usageCount = this.orderRepository.countByCustomerIdAndVoucherId(user.getId(), voucher.getId());
+                    int remaining = voucher.getUsageLimitPerUser() - usageCount.intValue();
+                    dto.setRemainingUsage(Math.max(0, remaining));
+                } else {
+                    dto.setRemainingUsage(voucher.getUsageLimitPerUser());
+                }
+            } else {
+                dto.setRemainingUsage(voucher.getUsageLimitPerUser());
+            }
+        } else {
+            dto.setRemainingUsage(null); // No limit
+        }
 
         if (voucher.getRestaurants() != null && !voucher.getRestaurants().isEmpty()) {
             List<resVoucherDTO.Restaurant> restaurantDTOs = voucher.getRestaurants().stream()
@@ -110,6 +144,11 @@ public class VoucherService {
             voucher.setRestaurants(restaurants);
         }
 
+        // Set remainingQuantity = totalQuantity when creating new voucher
+        if (voucher.getTotalQuantity() != null) {
+            voucher.setRemainingQuantity(voucher.getTotalQuantity());
+        }
+
         Voucher savedVoucher = voucherRepository.save(voucher);
         return convertToResVoucherDTO(savedVoucher);
     }
@@ -153,7 +192,22 @@ public class VoucherService {
             currentVoucher.setEndDate(voucher.getEndDate());
         }
         if (voucher.getTotalQuantity() != null) {
-            currentVoucher.setTotalQuantity(voucher.getTotalQuantity());
+            Integer quantityChange = voucher.getTotalQuantity();
+            if (quantityChange > 0) {
+                // Số dương: cộng cho cả totalQuantity và remainingQuantity
+                currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
+                currentVoucher.setRemainingQuantity((currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0) + quantityChange);
+            } else if (quantityChange < 0) {
+                // Số âm: kiểm tra remainingQuantity trước khi trừ
+                Integer absChange = Math.abs(quantityChange);
+                Integer currentRemaining = currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0;
+                if (currentRemaining >= absChange) {
+                    currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
+                    currentVoucher.setRemainingQuantity(currentRemaining + quantityChange);
+                } else {
+                    throw new IdInvalidException("Cannot reduce quantity. Only " + currentRemaining + " vouchers remaining, but trying to reduce by " + absChange);
+                }
+            }
         }
         if (voucher.getRestaurants() != null && !voucher.getRestaurants().isEmpty()) {
             List<Restaurant> restaurants = new ArrayList<>();
@@ -193,6 +247,16 @@ public class VoucherService {
         this.voucherRepository.deleteById(id);
     }
 
+    @Transactional
+    public resVoucherDTO toggleVoucherActive(Long id) throws IdInvalidException {
+        Voucher voucher = this.voucherRepository.findById(id)
+                .orElseThrow(() -> new IdInvalidException("Voucher not found with id: " + id));
+        
+        voucher.setActive(!voucher.getActive());
+        Voucher savedVoucher = this.voucherRepository.save(voucher);
+        return convertToResVoucherDTO(savedVoucher);
+    }
+
     public List<resVoucherDTO> getAvailableVouchersForOrder(Long orderId) throws IdInvalidException {
         // Get order details
         Order order = this.orderRepository.findById(orderId)
@@ -217,9 +281,14 @@ public class VoucherService {
         List<Voucher> vouchers = this.voucherRepository.findAvailableVouchersForOrder(
                 restaurantId, orderValue, currentTime);
 
-        // Filter vouchers based on usage limit per user
+        // Filter vouchers based on active status and usage limit per user
         List<Voucher> availableVouchers = vouchers.stream()
                 .filter(voucher -> {
+                    // Check if voucher is active
+                    if (voucher.getActive() == null || !voucher.getActive()) {
+                        return false;
+                    }
+
                     // If no usage limit, voucher is available
                     if (voucher.getUsageLimitPerUser() == null) {
                         return true;
@@ -234,9 +303,9 @@ public class VoucherService {
                 })
                 .collect(Collectors.toList());
 
-        // Convert to DTOs
+        // Convert to DTOs with user-specific remaining usage
         return availableVouchers.stream()
-                .map(this::convertToResVoucherDTO)
+                .map(voucher -> convertToResVoucherDTO(voucher, customerId))
                 .collect(Collectors.toList());
     }
 }
