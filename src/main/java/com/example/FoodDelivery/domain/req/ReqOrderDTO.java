@@ -32,6 +32,7 @@ public class ReqOrderDTO {
 
     private BigDecimal subtotal;
 
+    @NotNull(message = "Delivery fee không được để trống")
     private BigDecimal deliveryFee;
 
     private BigDecimal totalAmount;

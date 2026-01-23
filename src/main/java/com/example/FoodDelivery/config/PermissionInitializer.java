@@ -14,6 +14,9 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import com.example.FoodDelivery.domain.Permission;
+import com.example.FoodDelivery.domain.Role;
+import com.example.FoodDelivery.repository.PermissionRepository;
+import com.example.FoodDelivery.repository.RoleRepository;
 import com.example.FoodDelivery.service.PermissionService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +28,18 @@ public class PermissionInitializer implements CommandLineRunner {
 
     private final RequestMappingHandlerMapping requestMappingHandlerMapping;
     private final PermissionService permissionService;
+    private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
 
     public PermissionInitializer(
             @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping requestMappingHandlerMapping,
-            PermissionService permissionService) {
+            PermissionService permissionService,
+            RoleRepository roleRepository,
+            PermissionRepository permissionRepository) {
         this.requestMappingHandlerMapping = requestMappingHandlerMapping;
         this.permissionService = permissionService;
+        this.roleRepository = roleRepository;
+        this.permissionRepository = permissionRepository;
     }
 
     @Override
@@ -105,6 +114,9 @@ public class PermissionInitializer implements CommandLineRunner {
                             permission.getMethod(), permission.getApiPath(), e.getMessage());
                 }
             }
+
+            // Update ADMIN role with all permissions (including newly created ones)
+            updateAdminRolePermissions();
         }
 
         log.info("========== Permission Initialization Complete ==========");
@@ -112,6 +124,21 @@ public class PermissionInitializer implements CommandLineRunner {
         log.info("New permissions created: {}", newPermissions);
         log.info("Existing permissions: {}", existingPermissions);
         log.info("=======================================================");
+    }
+
+    /**
+     * Update ADMIN role to include all permissions in the system
+     */
+    private void updateAdminRolePermissions() {
+        Role adminRole = roleRepository.findByName("ADMIN");
+        if (adminRole != null) {
+            List<Permission> allPermissions = permissionRepository.findAll();
+            adminRole.setPermissions(allPermissions);
+            roleRepository.save(adminRole);
+            log.info("✅ ADMIN role updated with {} permissions (including new ones)", allPermissions.size());
+        } else {
+            log.info("ADMIN role not found yet, will be created by DataInitializer");
+        }
     }
 
     /**

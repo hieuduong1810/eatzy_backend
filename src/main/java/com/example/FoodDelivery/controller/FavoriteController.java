@@ -70,11 +70,14 @@ public class FavoriteController {
         return ResponseEntity.ok(favourite);
     }
 
-    @GetMapping("/favorites/customer/{customerId}")
-    @ApiMessage("Get customer favorites by customer id")
-    public ResponseEntity<List<ResFavouriteDTO>> getFavouritesByCustomerId(
-            @PathVariable("customerId") Long customerId) {
-        List<ResFavouriteDTO> favourites = favouriteService.getFavouritesByCustomerId(customerId);
+    @GetMapping("/favorites/my-favorites")
+    @ApiMessage("Get favorites for current user")
+    public ResponseEntity<List<ResFavouriteDTO>> getMyFavorites() throws IdInvalidException {
+        // Get current logged-in user's email from SecurityUtil
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not logged in"));
+
+        List<ResFavouriteDTO> favourites = favouriteService.getFavouritesByEmail(email);
         return ResponseEntity.ok(favourites);
     }
 

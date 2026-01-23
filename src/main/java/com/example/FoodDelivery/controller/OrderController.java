@@ -6,8 +6,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Order;
+import com.example.FoodDelivery.domain.req.ReqDeliveryFeeDTO;
 import com.example.FoodDelivery.domain.req.ReqOrderDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.order.ResDeliveryFeeDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderDTO;
 import com.example.FoodDelivery.service.OrderService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
@@ -35,14 +37,25 @@ import java.util.Map;
 public class OrderController {
     private final OrderService orderService;
     private final com.example.FoodDelivery.service.RestaurantService restaurantService;
-    private final com.example.FoodDelivery.service.DriverProfileService driverProfileService;
+    private final com.example.FoodDelivery.service.UserService userService;
 
     public OrderController(OrderService orderService,
             com.example.FoodDelivery.service.RestaurantService restaurantService,
-            com.example.FoodDelivery.service.DriverProfileService driverProfileService) {
+            com.example.FoodDelivery.service.UserService userService) {
         this.orderService = orderService;
         this.restaurantService = restaurantService;
-        this.driverProfileService = driverProfileService;
+        this.userService = userService;
+    }
+
+    @PostMapping("/orders/delivery-fee")
+    @ApiMessage("Calculate delivery fee")
+    public ResponseEntity<ResDeliveryFeeDTO> calculateDeliveryFee(
+            @Valid @RequestBody ReqDeliveryFeeDTO reqDeliveryFeeDTO) throws IdInvalidException {
+        ResDeliveryFeeDTO deliveryFee = orderService.getDeliveryFee(
+                reqDeliveryFeeDTO.getRestaurantId(),
+                java.math.BigDecimal.valueOf(reqDeliveryFeeDTO.getDeliveryLatitude()),
+                java.math.BigDecimal.valueOf(reqDeliveryFeeDTO.getDeliveryLongitude()));
+        return ResponseEntity.ok(deliveryFee);
     }
 
     @PostMapping("/orders")
@@ -172,20 +185,49 @@ public class OrderController {
 
     @GetMapping("/orders/my-restaurant")
     @ApiMessage("Get orders for current owner's restaurant")
-    public ResponseEntity<List<Order>> getOrdersByCurrentOwnerRestaurant() throws IdInvalidException {
+    public ResponseEntity<ResultPaginationDTO> getOrdersByCurrentOwnerRestaurant(
+            @Filter Specification<Order> spec, Pageable pageable) throws IdInvalidException {
         // Get restaurant owned by current logged-in user
         com.example.FoodDelivery.domain.Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
-        List<Order> orders = orderService.getOrdersByRestaurantId(restaurant.getId());
-        return ResponseEntity.ok(orders);
+        ResultPaginationDTO result = orderService.getOrdersDTOByRestaurantIdWithSpec(restaurant.getId(), spec,
+                pageable);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/orders/my-customer")
+    @ApiMessage("Get orders for current user as customer")
+    public ResponseEntity<ResultPaginationDTO> getMyCustomerOrders(
+            @Filter Specification<Order> spec, Pageable pageable) throws IdInvalidException {
+        // Get current logged-in user's email from SecurityUtil
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not logged in"));
+
+        // Get user by email
+        com.example.FoodDelivery.domain.User user = userService.handleGetUserByUsername(email);
+        if (user == null) {
+            throw new IdInvalidException("User not found");
+        }
+
+        ResultPaginationDTO result = orderService.getOrdersDTOByCustomerIdWithSpec(user.getId(), spec, pageable);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/orders/my-driver")
-    @ApiMessage("Get orders for current driver")
-    public ResponseEntity<List<Order>> getOrdersByCurrentDriver() throws IdInvalidException {
-        // Get driver profile of current logged-in user
-        com.example.FoodDelivery.domain.DriverProfile driverProfile = driverProfileService.getCurrentDriverProfile();
-        List<Order> orders = orderService.getOrdersByDriverId(driverProfile.getUser().getId());
-        return ResponseEntity.ok(orders);
+    @ApiMessage("Get orders for current user as driver")
+    public ResponseEntity<ResultPaginationDTO> getMyDriverOrders(
+            @Filter Specification<Order> spec, Pageable pageable) throws IdInvalidException {
+        // Get current logged-in user's email from SecurityUtil
+        String email = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not logged in"));
+
+        // Get user by email
+        com.example.FoodDelivery.domain.User user = userService.handleGetUserByUsername(email);
+        if (user == null) {
+            throw new IdInvalidException("User not found");
+        }
+
+        ResultPaginationDTO result = orderService.getOrdersDTOByDriverIdWithSpec(user.getId(), spec, pageable);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/orders/status/{orderStatus}")

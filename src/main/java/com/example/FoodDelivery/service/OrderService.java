@@ -28,6 +28,7 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.Voucher;
 import com.example.FoodDelivery.domain.req.ReqOrderDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.order.ResDeliveryFeeDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderItemDTO;
 import com.example.FoodDelivery.domain.res.order.ResOrderItemOptionDTO;
@@ -368,6 +369,87 @@ public class OrderService {
     }
 
     /**
+     * Public API method to calculate delivery fee and return detailed breakdown
+     */
+    public ResDeliveryFeeDTO getDeliveryFee(Long restaurantId, BigDecimal deliveryLatitude,
+            BigDecimal deliveryLongitude) throws IdInvalidException {
+        // Validate restaurant
+        Restaurant restaurant = restaurantService.getRestaurantById(restaurantId);
+        if (restaurant == null) {
+            throw new IdInvalidException("Restaurant not found with id: " + restaurantId);
+        }
+
+        if (restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
+            throw new IdInvalidException("Restaurant location is required to calculate delivery fee");
+        }
+
+        if (deliveryLatitude == null || deliveryLongitude == null) {
+            throw new IdInvalidException("Delivery location is required to calculate delivery fee");
+        }
+
+        // Get configuration values
+        BigDecimal baseFee = new BigDecimal("15000"); // Default 15,000 VND
+        BigDecimal baseDistance = new BigDecimal("3"); // Default 3 km
+        BigDecimal perKmFee = new BigDecimal("5000"); // Default 5,000 VND per km
+
+        try {
+            SystemConfiguration baseFeeConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_BASE_FEE");
+            if (baseFeeConfig != null && baseFeeConfig.getConfigValue() != null
+                    && !baseFeeConfig.getConfigValue().isEmpty()) {
+                baseFee = new BigDecimal(baseFeeConfig.getConfigValue());
+            }
+
+            SystemConfiguration baseDistanceConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_BASE_DISTANCE");
+            if (baseDistanceConfig != null && baseDistanceConfig.getConfigValue() != null
+                    && !baseDistanceConfig.getConfigValue().isEmpty()) {
+                baseDistance = new BigDecimal(baseDistanceConfig.getConfigValue());
+            }
+
+            SystemConfiguration perKmFeeConfig = systemConfigurationService
+                    .getSystemConfigurationByKey("DELIVERY_PER_KM_FEE");
+            if (perKmFeeConfig != null && perKmFeeConfig.getConfigValue() != null
+                    && !perKmFeeConfig.getConfigValue().isEmpty()) {
+                perKmFee = new BigDecimal(perKmFeeConfig.getConfigValue());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get delivery fee configuration, using defaults", e);
+        }
+
+        // Get real driving distance using Mapbox API
+        BigDecimal distance = mapboxService.getDrivingDistance(
+                restaurant.getLatitude(),
+                restaurant.getLongitude(),
+                deliveryLatitude,
+                deliveryLongitude);
+
+        if (distance == null) {
+            log.warn("Failed to get driving distance from Mapbox, using base fee");
+            return new ResDeliveryFeeDTO(baseFee, null, BigDecimal.ONE, baseFee, baseDistance, perKmFee);
+        }
+
+        // Get surge multiplier from dynamic pricing service
+        BigDecimal surgeMultiplier = dynamicPricingService.getSurgeMultiplier(
+                restaurant.getLatitude(),
+                restaurant.getLongitude());
+
+        // Calculate final delivery fee using the private helper
+        BigDecimal deliveryFee = calculateDeliveryFee(restaurant, deliveryLatitude, deliveryLongitude);
+
+        // Build response DTO with breakdown
+        ResDeliveryFeeDTO response = new ResDeliveryFeeDTO();
+        response.setDeliveryFee(deliveryFee.setScale(2, java.math.RoundingMode.HALF_UP));
+        response.setDistance(distance.setScale(2, java.math.RoundingMode.HALF_UP));
+        response.setSurgeMultiplier(surgeMultiplier.setScale(2, java.math.RoundingMode.HALF_UP));
+        response.setBaseFee(baseFee);
+        response.setBaseDistance(baseDistance);
+        response.setPerKmFee(perKmFee);
+
+        return response;
+    }
+
+    /**
      * Helper method to calculate total discount from multiple vouchers
      */
     private BigDecimal calculateVouchersDiscount(List<Voucher> vouchers, BigDecimal subtotal, BigDecimal deliveryFee) {
@@ -703,6 +785,21 @@ public class OrderService {
                 restaurant,
                 savedOrder.getDeliveryLatitude(),
                 savedOrder.getDeliveryLongitude());
+
+        // Validate delivery fee from request matches calculated fee
+        if (reqOrderDTO.getDeliveryFee() != null) {
+            // Compare with tolerance for rounding differences (1 VND)
+            BigDecimal clientDeliveryFee = reqOrderDTO.getDeliveryFee().setScale(0, java.math.RoundingMode.HALF_UP);
+            BigDecimal serverDeliveryFee = deliveryFee.setScale(0, java.math.RoundingMode.HALF_UP);
+
+            if (clientDeliveryFee.compareTo(serverDeliveryFee) != 0) {
+                log.warn("Delivery fee mismatch - Client: {}, Server: {}", clientDeliveryFee, serverDeliveryFee);
+                throw new IdInvalidException(
+                        "Phí giao hàng đã thay đổi. Vui lòng tải lại trang để cập nhật giá mới. " +
+                                "(Giá cũ: " + clientDeliveryFee + " VND, Giá mới: " + serverDeliveryFee + " VND)");
+            }
+        }
+
         savedOrder.setDeliveryFee(deliveryFee);
 
         // Calculate vouchers discount (including free shipping) - supports multiple
@@ -1471,5 +1568,65 @@ public class OrderService {
 
     public void deleteOrder(Long id) {
         this.orderRepository.deleteById(id);
+    }
+
+    public ResultPaginationDTO getOrdersDTOByRestaurantIdWithSpec(Long restaurantId, Specification<Order> spec,
+            Pageable pageable) {
+        // Combine base filter (restaurantId) with additional spec from @Filter
+        Specification<Order> baseSpec = (root, query, cb) -> cb.equal(root.get("restaurant").get("id"), restaurantId);
+        Specification<Order> combinedSpec = spec != null ? baseSpec.and(spec) : baseSpec;
+
+        Page<Order> page = this.orderRepository.findAll(combinedSpec, pageable);
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(page.getTotalElements());
+        meta.setPages(page.getTotalPages());
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(this::convertToResOrderDTO)
+                .collect(Collectors.toList()));
+        return result;
+    }
+
+    public ResultPaginationDTO getOrdersDTOByCustomerIdWithSpec(Long customerId, Specification<Order> spec,
+            Pageable pageable) {
+        // Combine base filter (customerId) with additional spec from @Filter
+        Specification<Order> baseSpec = (root, query, cb) -> cb.equal(root.get("customer").get("id"), customerId);
+        Specification<Order> combinedSpec = spec != null ? baseSpec.and(spec) : baseSpec;
+
+        Page<Order> page = this.orderRepository.findAll(combinedSpec, pageable);
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(page.getTotalElements());
+        meta.setPages(page.getTotalPages());
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(this::convertToResOrderDTO)
+                .collect(Collectors.toList()));
+        return result;
+    }
+
+    public ResultPaginationDTO getOrdersDTOByDriverIdWithSpec(Long driverId, Specification<Order> spec,
+            Pageable pageable) {
+        // Combine base filter (driverId) with additional spec from @Filter
+        Specification<Order> baseSpec = (root, query, cb) -> cb.equal(root.get("driver").get("id"), driverId);
+        Specification<Order> combinedSpec = spec != null ? baseSpec.and(spec) : baseSpec;
+
+        Page<Order> page = this.orderRepository.findAll(combinedSpec, pageable);
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(page.getTotalElements());
+        meta.setPages(page.getTotalPages());
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(this::convertToResOrderDTO)
+                .collect(Collectors.toList()));
+        return result;
     }
 }

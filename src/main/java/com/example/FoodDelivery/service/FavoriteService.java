@@ -73,6 +73,16 @@ public class FavoriteService {
                 .toList();
     }
 
+    public List<ResFavouriteDTO> getFavouritesByEmail(String email) throws IdInvalidException {
+        User customer = this.userService.handleGetUserByUsername(email);
+        if (customer == null) {
+            throw new IdInvalidException("User not found with email: " + email);
+        }
+        return this.favouriteRepository.findByCustomerId(customer.getId()).stream()
+                .map(this::convertToDTO)
+                .toList();
+    }
+
     public ResFavouriteDTO createFavourite(Favorite favourite) throws IdInvalidException {
         String currentUserEmail = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new IdInvalidException("User not authenticated"));
