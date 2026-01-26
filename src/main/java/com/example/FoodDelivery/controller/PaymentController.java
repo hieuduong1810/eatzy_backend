@@ -18,6 +18,9 @@ import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/v1/payment")
@@ -27,6 +30,9 @@ public class PaymentController {
     private final OrderService orderService;
     private final UserService userService;
     private final WalletTransactionService walletTransactionService;
+
+    @Value("${frontend.home-url:https://eatzy-customer.hoanduong.net/home}")
+    private String frontendHomeUrl;
 
     public PaymentController(
             PaymentService paymentService,
@@ -187,12 +193,12 @@ public class PaymentController {
     }
 
     /**
-     * VNPAY callback handler
+     * VNPAY callback handler - redirects to frontend after payment
      */
     @GetMapping("/vnpay/callback")
     @ApiMessage("VNPAY payment callback")
-    public ResponseEntity<Map<String, Object>> vnpayCallback(@RequestParam Map<String, String> params)
-            throws IdInvalidException {
+    public void vnpayCallback(@RequestParam Map<String, String> params,
+            HttpServletResponse response) throws IdInvalidException, java.io.IOException {
         Map<String, Object> result = vnPayService.processCallback(params);
 
         // Update order payment status
@@ -209,7 +215,13 @@ public class PaymentController {
             }
         }
 
-        return ResponseEntity.ok(result);
+        // Redirect to frontend home page with payment result
+        boolean success = (Boolean) result.get("success");
+        String redirectUrl = frontendHomeUrl + "?payment=" + (success ? "success" : "failed");
+        if (orderId != null) {
+            redirectUrl += "&orderId=" + orderId;
+        }
+        response.sendRedirect(redirectUrl);
     }
 
     /**
