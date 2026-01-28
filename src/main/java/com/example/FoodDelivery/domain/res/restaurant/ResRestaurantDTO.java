@@ -57,6 +57,8 @@ public class ResRestaurantDTO {
     public static class User {
         private long id;
         private String name;
+        private String phoneNumber;
+        private Boolean isActive;
     }
 
     @Getter

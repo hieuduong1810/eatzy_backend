@@ -1,6 +1,8 @@
 package com.example.FoodDelivery.service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.example.FoodDelivery.domain.CustomerProfile;
 import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.customerProfile.ResCustomerProfileDTO;
 import com.example.FoodDelivery.repository.CustomerProfileRepository;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
@@ -85,11 +88,37 @@ public class CustomerProfileService {
         meta.setTotal(page.getTotalElements());
         meta.setPages(page.getTotalPages());
         result.setMeta(meta);
-        result.setResult(page.getContent());
+
+        List<ResCustomerProfileDTO> dtoList = page.getContent().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        result.setResult(dtoList);
         return result;
     }
 
     public void deleteCustomerProfile(Long id) {
         this.customerProfileRepository.deleteById(id);
+    }
+
+    public ResCustomerProfileDTO convertToDTO(CustomerProfile profile) {
+        if (profile == null) {
+            return null;
+        }
+
+        ResCustomerProfileDTO dto = new ResCustomerProfileDTO();
+        dto.setId(profile.getId());
+        dto.setDateOfBirth(profile.getDateOfBirth());
+        dto.setHometown(profile.getHometown());
+
+        if (profile.getUser() != null) {
+            ResCustomerProfileDTO.UserCustomer userDTO = new ResCustomerProfileDTO.UserCustomer();
+            userDTO.setId(profile.getUser().getId());
+            userDTO.setName(profile.getUser().getName());
+            userDTO.setPhoneNumber(profile.getUser().getPhoneNumber());
+            userDTO.setIsActive(profile.getUser().getIsActive());
+            dto.setUser(userDTO);
+        }
+
+        return dto;
     }
 }

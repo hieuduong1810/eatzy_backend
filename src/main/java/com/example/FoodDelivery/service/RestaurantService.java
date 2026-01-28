@@ -110,6 +110,8 @@ public class RestaurantService {
             ResRestaurantDTO.User owner = new ResRestaurantDTO.User();
             owner.setId(restaurant.getOwner().getId());
             owner.setName(restaurant.getOwner().getName());
+            owner.setPhoneNumber(restaurant.getOwner().getPhoneNumber());
+            owner.setIsActive(restaurant.getOwner().getIsActive());
             dto.setOwner(owner);
         }
 
