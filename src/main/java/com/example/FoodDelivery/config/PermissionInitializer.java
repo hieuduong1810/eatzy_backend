@@ -118,7 +118,7 @@ public class PermissionInitializer implements CommandLineRunner {
 
         // Always update roles with all permissions (including DRIVER, CUSTOMER,
         // RESTAURANT)
-        updateAdminRolePermissions();
+        updateAllRolesPermissions();
 
         log.info("========== Permission Initialization Complete ==========");
         log.info("Total endpoints scanned: {}", totalEndpoints);
@@ -128,41 +128,22 @@ public class PermissionInitializer implements CommandLineRunner {
     }
 
     /**
-     * Update ADMIN role to include all permissions in the system
-     * Also create DRIVER, CUSTOMER, RESTAURANT roles with full permissions if they
-     * don't exist
+     * Update all roles (ADMIN, DRIVER, CUSTOMER, RESTAURANT) with all permissions
+     * Only updates if roles exist - role creation is handled by DataInitializer
      */
-    private void updateAdminRolePermissions() {
+    private void updateAllRolesPermissions() {
         List<Permission> allPermissions = permissionRepository.findAll();
 
-        // Update ADMIN role
-        Role adminRole = roleRepository.findByName("ADMIN");
-        if (adminRole != null) {
-            adminRole.setPermissions(allPermissions);
-            roleRepository.save(adminRole);
-            log.info("✅ ADMIN role updated with {} permissions (including new ones)", allPermissions.size());
-        } else {
-            log.info("ADMIN role not found yet, will be created by DataInitializer");
-        }
-
-        // Create or update DRIVER, CUSTOMER, RESTAURANT roles with full permissions
-        String[] rolesToCheck = { "DRIVER", "CUSTOMER", "RESTAURANT" };
-        for (String roleName : rolesToCheck) {
+        // Update all 4 roles with full permissions
+        String[] rolesToUpdate = { "ADMIN", "DRIVER", "CUSTOMER", "RESTAURANT" };
+        for (String roleName : rolesToUpdate) {
             Role role = roleRepository.findByName(roleName);
-            if (role == null) {
-                // Create new role with full permissions
-                role = new Role();
-                role.setName(roleName);
-                role.setDescription(roleName + " role with full permissions");
-                role.setActive(true);
-                role.setPermissions(allPermissions);
-                roleRepository.save(role);
-                log.info("✅ {} role created with {} permissions", roleName, allPermissions.size());
-            } else {
-                // Update existing role with all permissions
+            if (role != null) {
                 role.setPermissions(allPermissions);
                 roleRepository.save(role);
                 log.info("✅ {} role updated with {} permissions", roleName, allPermissions.size());
+            } else {
+                log.info("{} role not found yet, will be created by DataInitializer", roleName);
             }
         }
     }

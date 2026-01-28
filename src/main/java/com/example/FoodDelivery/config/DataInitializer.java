@@ -94,6 +94,59 @@ public class DataInitializer implements CommandLineRunner {
                         log.info("✅ ADMIN role updated with {} permissions", allPermissions.size());
                 }
 
+                // Get RESTAURANT, CUSTOMER, DRIVER roles or create them if not exist
+                List<Permission> allPermissions = permissionRepository.findAll();
+
+                Role restaurantRole = roleRepository.findByName("RESTAURANT");
+                if (restaurantRole == null) {
+                        log.info("Creating RESTAURANT role...");
+                        restaurantRole = new Role();
+                        restaurantRole.setName("RESTAURANT");
+                        restaurantRole.setDescription("Restaurant owner role with full access");
+                        restaurantRole.setActive(true);
+                        restaurantRole.setPermissions(allPermissions);
+                        restaurantRole = roleRepository.save(restaurantRole);
+                        log.info("✅ RESTAURANT role created with {} permissions", allPermissions.size());
+                } else {
+                        restaurantRole.setPermissions(allPermissions);
+                        restaurantRole = roleRepository.save(restaurantRole);
+                        log.info("✅ RESTAURANT role updated with {} permissions", allPermissions.size());
+                }
+
+                Role customerRole = roleRepository.findByName("CUSTOMER");
+                if (customerRole == null) {
+                        log.info("Creating CUSTOMER role...");
+                        customerRole = new Role();
+                        customerRole.setName("CUSTOMER");
+                        customerRole.setDescription("Customer role with full access");
+                        customerRole.setActive(true);
+                        customerRole.setPermissions(allPermissions);
+                        customerRole = roleRepository.save(customerRole);
+                        log.info("✅ CUSTOMER role created with {} permissions", allPermissions.size());
+                } else {
+                        customerRole.setPermissions(allPermissions);
+                        customerRole = roleRepository.save(customerRole);
+                        log.info("✅ CUSTOMER role updated with {} permissions", allPermissions.size());
+                }
+
+                Role driverRole = roleRepository.findByName("DRIVER");
+                if (driverRole == null) {
+                        log.info("Creating DRIVER role...");
+                        driverRole = new Role();
+                        driverRole.setName("DRIVER");
+                        driverRole.setDescription("Driver role with full access");
+                        driverRole.setActive(true);
+                        driverRole.setPermissions(allPermissions);
+                        driverRole = roleRepository.save(driverRole);
+                        log.info("✅ DRIVER role created with {} permissions", allPermissions.size());
+                } else {
+                        driverRole.setPermissions(allPermissions);
+                        driverRole = roleRepository.save(driverRole);
+                        log.info("✅ DRIVER role updated with {} permissions", allPermissions.size());
+                }
+
+                log.info("✅ All roles ready: ADMIN, RESTAURANT, CUSTOMER, DRIVER");
+
                 // 2. Create users - IMPORTANT: Create restaurant owners first (IDs 1-15) to
                 // match mockdata.sql owner_id
                 log.info("Creating users...");
@@ -110,7 +163,7 @@ public class DataInitializer implements CommandLineRunner {
                 restaurantUser.setAddress("tp hcm");
                 restaurantUser.setAge(25);
                 restaurantUser.setIsActive(true);
-                restaurantUser.setRole(adminRole);
+                restaurantUser.setRole(restaurantRole);
                 restaurantUser = userRepository.save(restaurantUser);
                 allRestaurantOwners.add(restaurantUser);
                 log.info("✅ Restaurant owner 1 created (ID: {})", restaurantUser.getId());
@@ -125,7 +178,7 @@ public class DataInitializer implements CommandLineRunner {
                         owner.setAddress("tp hcm");
                         owner.setAge(25 + i);
                         owner.setIsActive(true);
-                        owner.setRole(adminRole);
+                        owner.setRole(restaurantRole);
                         owner = userRepository.save(owner);
                         allRestaurantOwners.add(owner);
                 }
@@ -153,7 +206,7 @@ public class DataInitializer implements CommandLineRunner {
                 driverUser.setAddress("tp hcm");
                 driverUser.setAge(30);
                 driverUser.setIsActive(true);
-                driverUser.setRole(adminRole);
+                driverUser.setRole(driverRole);
                 driverUser = userRepository.save(driverUser);
                 log.info("✅ Driver user created");
 
@@ -166,7 +219,7 @@ public class DataInitializer implements CommandLineRunner {
                 customerUser.setAddress("tp hcm");
                 customerUser.setAge(22);
                 customerUser.setIsActive(true);
-                customerUser.setRole(adminRole);
+                customerUser.setRole(customerRole);
                 customerUser = userRepository.save(customerUser);
                 log.info("✅ Customer user created");
 
@@ -181,7 +234,7 @@ public class DataInitializer implements CommandLineRunner {
                         customer.setAddress("tp hcm");
                         customer.setAge(20 + i);
                         customer.setIsActive(true);
-                        customer.setRole(adminRole);
+                        customer.setRole(customerRole);
                         customer = userRepository.save(customer);
                         additionalCustomers.add(customer);
                 }
@@ -198,7 +251,7 @@ public class DataInitializer implements CommandLineRunner {
                         driver.setAddress("tp hcm");
                         driver.setAge(25 + i);
                         driver.setIsActive(true);
-                        driver.setRole(adminRole);
+                        driver.setRole(driverRole);
                         driver = userRepository.save(driver);
                         additionalDrivers.add(driver);
                 }

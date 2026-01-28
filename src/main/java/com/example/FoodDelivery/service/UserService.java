@@ -4,8 +4,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.example.FoodDelivery.domain.DriverProfile;
+import com.example.FoodDelivery.domain.Restaurant;
 import com.example.FoodDelivery.domain.Role;
 import com.example.FoodDelivery.domain.User;
+import com.example.FoodDelivery.repository.DriverProfileRepository;
+import com.example.FoodDelivery.repository.RestaurantRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -24,16 +28,22 @@ public class UserService {
     private final RoleService roleService;
     private final WalletService walletService;
     private final EmailVerificationService emailVerificationService;
+    private final RestaurantRepository restaurantRepository;
+    private final DriverProfileRepository driverProfileRepository;
 
     public UserService(
             UserRepository userRepository,
             RoleService roleService,
             WalletService walletService,
-            EmailVerificationService emailVerificationService) {
+            EmailVerificationService emailVerificationService,
+            RestaurantRepository restaurantRepository,
+            DriverProfileRepository driverProfileRepository) {
         this.userRepository = userRepository;
         this.roleService = roleService;
         this.walletService = walletService;
         this.emailVerificationService = emailVerificationService;
+        this.restaurantRepository = restaurantRepository;
+        this.driverProfileRepository = driverProfileRepository;
     }
 
     @Transactional
@@ -199,5 +209,52 @@ public class UserService {
 
     public User getUserByRefreshTokenAndEmail(String refreshToken, String email) {
         return this.userRepository.findByRefreshTokenAndEmail(refreshToken, email);
+    }
+
+    /**
+     * Set user active status
+     * When changing from true to false:
+     * - If role is RESTAURANT: set restaurant status to CLOSED
+     * - If role is DRIVER: set driver profile status to OFFLINE
+     * - Clear refresh token to force logout
+     */
+    @Transactional
+    public User setUserActiveStatus(Long userId, Boolean isActive) {
+        User user = this.getUserById(userId);
+        if (user == null) {
+            return null;
+        }
+
+        Boolean previousStatus = user.getIsActive();
+        user.setIsActive(isActive);
+
+        // If changing to inactive, update related entities and force logout
+        if (Boolean.FALSE.equals(isActive)) {
+            // Clear refresh token to force logout
+            user.setRefreshToken(null);
+
+            // Only update related entities status if changing from active to inactive
+            if (Boolean.TRUE.equals(previousStatus)) {
+                String roleName = user.getRole() != null ? user.getRole().getName() : null;
+
+                if ("RESTAURANT".equals(roleName)) {
+                    // Find and close the restaurant owned by this user
+                    Restaurant restaurant = this.restaurantRepository.findByOwnerId(user.getId()).orElse(null);
+                    if (restaurant != null) {
+                        restaurant.setStatus("CLOSED");
+                        this.restaurantRepository.save(restaurant);
+                    }
+                } else if ("DRIVER".equals(roleName)) {
+                    // Find and set driver profile to OFFLINE
+                    DriverProfile driverProfile = this.driverProfileRepository.findByUserId(user.getId()).orElse(null);
+                    if (driverProfile != null) {
+                        driverProfile.setStatus("OFFLINE");
+                        this.driverProfileRepository.save(driverProfile);
+                    }
+                }
+            }
+        }
+
+        return this.userRepository.save(user);
     }
 }

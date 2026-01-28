@@ -95,4 +95,23 @@ public class UserController {
         this.userService.handleDeleteUser(id);
         return ResponseEntity.ok(null);
     }
+
+    @PutMapping("/users/{id}/active")
+    @ApiMessage("Set user active status")
+    public ResponseEntity<ResUserDTO> setUserActiveStatus(
+            @PathVariable("id") Long id,
+            @RequestBody java.util.Map<String, Boolean> request) throws IdInvalidException {
+
+        Boolean isActive = request.get("isActive");
+        if (isActive == null) {
+            throw new IdInvalidException("isActive field is required");
+        }
+
+        User updatedUser = this.userService.setUserActiveStatus(id, isActive);
+        if (updatedUser == null) {
+            throw new IdInvalidException("User with id " + id + " does not exist");
+        }
+
+        return ResponseEntity.ok(this.userService.convertToResUserDTO(updatedUser));
+    }
 }
