@@ -114,10 +114,11 @@ public class PermissionInitializer implements CommandLineRunner {
                             permission.getMethod(), permission.getApiPath(), e.getMessage());
                 }
             }
-
-            // Update ADMIN role with all permissions (including newly created ones)
-            updateAdminRolePermissions();
         }
+
+        // Always update roles with all permissions (including DRIVER, CUSTOMER,
+        // RESTAURANT)
+        updateAdminRolePermissions();
 
         log.info("========== Permission Initialization Complete ==========");
         log.info("Total endpoints scanned: {}", totalEndpoints);
@@ -128,16 +129,41 @@ public class PermissionInitializer implements CommandLineRunner {
 
     /**
      * Update ADMIN role to include all permissions in the system
+     * Also create DRIVER, CUSTOMER, RESTAURANT roles with full permissions if they
+     * don't exist
      */
     private void updateAdminRolePermissions() {
+        List<Permission> allPermissions = permissionRepository.findAll();
+
+        // Update ADMIN role
         Role adminRole = roleRepository.findByName("ADMIN");
         if (adminRole != null) {
-            List<Permission> allPermissions = permissionRepository.findAll();
             adminRole.setPermissions(allPermissions);
             roleRepository.save(adminRole);
             log.info("✅ ADMIN role updated with {} permissions (including new ones)", allPermissions.size());
         } else {
             log.info("ADMIN role not found yet, will be created by DataInitializer");
+        }
+
+        // Create or update DRIVER, CUSTOMER, RESTAURANT roles with full permissions
+        String[] rolesToCheck = { "DRIVER", "CUSTOMER", "RESTAURANT" };
+        for (String roleName : rolesToCheck) {
+            Role role = roleRepository.findByName(roleName);
+            if (role == null) {
+                // Create new role with full permissions
+                role = new Role();
+                role.setName(roleName);
+                role.setDescription(roleName + " role with full permissions");
+                role.setActive(true);
+                role.setPermissions(allPermissions);
+                roleRepository.save(role);
+                log.info("✅ {} role created with {} permissions", roleName, allPermissions.size());
+            } else {
+                // Update existing role with all permissions
+                role.setPermissions(allPermissions);
+                roleRepository.save(role);
+                log.info("✅ {} role updated with {} permissions", roleName, allPermissions.size());
+            }
         }
     }
 
