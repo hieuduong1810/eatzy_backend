@@ -116,6 +116,9 @@ public class CustomerProfileService {
             userDTO.setName(profile.getUser().getName());
             userDTO.setPhoneNumber(profile.getUser().getPhoneNumber());
             userDTO.setIsActive(profile.getUser().getIsActive());
+            userDTO.setGender(profile.getUser().getGender());
+            userDTO.setAge(profile.getUser().getAge());
+            userDTO.setAddress(profile.getUser().getAddress());
             dto.setUser(userDTO);
         }
 

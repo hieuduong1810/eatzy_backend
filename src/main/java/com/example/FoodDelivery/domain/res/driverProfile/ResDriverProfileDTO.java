@@ -2,6 +2,7 @@ package com.example.FoodDelivery.domain.res.driverProfile;
 
 import java.math.BigDecimal;
 
+import com.example.FoodDelivery.util.constant.GenderEnum;
 import com.example.FoodDelivery.util.constant.StatusEnum;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -170,5 +171,8 @@ public class ResDriverProfileDTO {
         private String email;
         private String phoneNumber;
         private Boolean isActive;
+        private GenderEnum gender;
+        private Integer age;
+        private String address;
     }
 }

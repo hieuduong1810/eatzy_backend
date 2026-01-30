@@ -2,6 +2,7 @@ package com.example.FoodDelivery.domain.res.customerProfile;
 
 import java.time.LocalDate;
 
+import com.example.FoodDelivery.util.constant.GenderEnum;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
@@ -31,5 +32,8 @@ public class ResCustomerProfileDTO {
         private String name;
         private String phoneNumber;
         private Boolean isActive;
+        private GenderEnum gender;
+        private Integer age;
+        private String address;
     }
 }

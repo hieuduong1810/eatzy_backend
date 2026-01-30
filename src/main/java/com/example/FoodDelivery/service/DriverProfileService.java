@@ -573,7 +573,7 @@ public class DriverProfileService {
         dto.setCodLimit(profile.getCodLimit());
         dto.setCompletedTrips(profile.getCompletedTrips());
 
-        // User info (only id, name, email, phoneNumber, isActive)
+        // User info
         if (profile.getUser() != null) {
             ResDriverProfileDTO.UserDriver userDriver = new ResDriverProfileDTO.UserDriver();
             userDriver.setId(profile.getUser().getId());
@@ -581,6 +581,9 @@ public class DriverProfileService {
             userDriver.setEmail(profile.getUser().getEmail());
             userDriver.setPhoneNumber(profile.getUser().getPhoneNumber());
             userDriver.setIsActive(profile.getUser().getIsActive());
+            userDriver.setGender(profile.getUser().getGender());
+            userDriver.setAge(profile.getUser().getAge());
+            userDriver.setAddress(profile.getUser().getAddress());
             dto.setUser(userDriver);
         }
 

@@ -112,6 +112,9 @@ public class RestaurantService {
             owner.setName(restaurant.getOwner().getName());
             owner.setPhoneNumber(restaurant.getOwner().getPhoneNumber());
             owner.setIsActive(restaurant.getOwner().getIsActive());
+            owner.setGender(restaurant.getOwner().getGender());
+            owner.setAge(restaurant.getOwner().getAge());
+            owner.setAddress(restaurant.getOwner().getAddress());
             dto.setOwner(owner);
         }
 

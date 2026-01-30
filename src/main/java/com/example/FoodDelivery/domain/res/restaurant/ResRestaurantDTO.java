@@ -7,6 +7,7 @@ import com.example.FoodDelivery.domain.Dish;
 import com.example.FoodDelivery.domain.DishCategory;
 import com.example.FoodDelivery.domain.MonthlyRevenueReport;
 import com.example.FoodDelivery.domain.Voucher;
+import com.example.FoodDelivery.util.constant.GenderEnum;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -59,6 +60,9 @@ public class ResRestaurantDTO {
         private String name;
         private String phoneNumber;
         private Boolean isActive;
+        private GenderEnum gender;
+        private Integer age;
+        private String address;
     }
 
     @Getter
