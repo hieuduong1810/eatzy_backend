@@ -196,16 +196,21 @@ public class VoucherService {
             if (quantityChange > 0) {
                 // Số dương: cộng cho cả totalQuantity và remainingQuantity
                 currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
-                currentVoucher.setRemainingQuantity((currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0) + quantityChange);
+                currentVoucher.setRemainingQuantity(
+                        (currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0)
+                                + quantityChange);
             } else if (quantityChange < 0) {
                 // Số âm: kiểm tra remainingQuantity trước khi trừ
                 Integer absChange = Math.abs(quantityChange);
-                Integer currentRemaining = currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0;
+                Integer currentRemaining = currentVoucher.getRemainingQuantity() != null
+                        ? currentVoucher.getRemainingQuantity()
+                        : 0;
                 if (currentRemaining >= absChange) {
                     currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
                     currentVoucher.setRemainingQuantity(currentRemaining + quantityChange);
                 } else {
-                    throw new IdInvalidException("Cannot reduce quantity. Only " + currentRemaining + " vouchers remaining, but trying to reduce by " + absChange);
+                    throw new IdInvalidException("Cannot reduce quantity. Only " + currentRemaining
+                            + " vouchers remaining, but trying to reduce by " + absChange);
                 }
             }
         }
@@ -247,11 +252,84 @@ public class VoucherService {
         this.voucherRepository.deleteById(id);
     }
 
+    /**
+     * Update voucher and apply to ALL restaurants in the system
+     */
+    public resVoucherDTO updateVoucherForAllRestaurants(Voucher voucher) throws IdInvalidException {
+        // check id
+        Voucher currentVoucher = this.voucherRepository.findById(voucher.getId()).orElse(null);
+        if (currentVoucher == null) {
+            throw new IdInvalidException("Voucher not found with id: " + voucher.getId());
+        }
+
+        if (voucher.getCode() != null && !voucher.getCode().equals(currentVoucher.getCode())) {
+            if (this.voucherRepository.existsByCode(voucher.getCode())) {
+                throw new IdInvalidException("Voucher code already exists: " + voucher.getCode());
+            }
+            currentVoucher.setCode(voucher.getCode());
+        }
+        if (voucher.getDescription() != null) {
+            currentVoucher.setDescription(voucher.getDescription());
+        }
+        if (voucher.getDiscountType() != null) {
+            currentVoucher.setDiscountType(voucher.getDiscountType());
+        }
+        if (voucher.getDiscountValue() != null) {
+            currentVoucher.setDiscountValue(voucher.getDiscountValue());
+        }
+        if (voucher.getMinOrderValue() != null) {
+            currentVoucher.setMinOrderValue(voucher.getMinOrderValue());
+        }
+        if (voucher.getMaxDiscountAmount() != null) {
+            currentVoucher.setMaxDiscountAmount(voucher.getMaxDiscountAmount());
+        }
+
+        if (voucher.getUsageLimitPerUser() != null) {
+            currentVoucher.setUsageLimitPerUser(voucher.getUsageLimitPerUser());
+        }
+        if (voucher.getStartDate() != null) {
+            currentVoucher.setStartDate(voucher.getStartDate());
+        }
+        if (voucher.getEndDate() != null) {
+            currentVoucher.setEndDate(voucher.getEndDate());
+        }
+        if (voucher.getTotalQuantity() != null) {
+            Integer quantityChange = voucher.getTotalQuantity();
+            if (quantityChange > 0) {
+                // Số dương: cộng cho cả totalQuantity và remainingQuantity
+                currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
+                currentVoucher.setRemainingQuantity(
+                        (currentVoucher.getRemainingQuantity() != null ? currentVoucher.getRemainingQuantity() : 0)
+                                + quantityChange);
+            } else if (quantityChange < 0) {
+                // Số âm: kiểm tra remainingQuantity trước khi trừ
+                Integer absChange = Math.abs(quantityChange);
+                Integer currentRemaining = currentVoucher.getRemainingQuantity() != null
+                        ? currentVoucher.getRemainingQuantity()
+                        : 0;
+                if (currentRemaining >= absChange) {
+                    currentVoucher.setTotalQuantity(currentVoucher.getTotalQuantity() + quantityChange);
+                    currentVoucher.setRemainingQuantity(currentRemaining + quantityChange);
+                } else {
+                    throw new IdInvalidException("Cannot reduce quantity. Only " + currentRemaining
+                            + " vouchers remaining, but trying to reduce by " + absChange);
+                }
+            }
+        }
+
+        // Lấy tất cả restaurants và áp dụng cho voucher
+        List<Restaurant> allRestaurants = this.restaurantRepository.findAll();
+        currentVoucher.setRestaurants(allRestaurants);
+
+        Voucher savedVoucher = voucherRepository.save(currentVoucher);
+        return convertToResVoucherDTO(savedVoucher);
+    }
+
     @Transactional
     public resVoucherDTO toggleVoucherActive(Long id) throws IdInvalidException {
         Voucher voucher = this.voucherRepository.findById(id)
                 .orElseThrow(() -> new IdInvalidException("Voucher not found with id: " + id));
-        
+
         voucher.setActive(!voucher.getActive());
         Voucher savedVoucher = this.voucherRepository.save(voucher);
         return convertToResVoucherDTO(savedVoucher);

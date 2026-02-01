@@ -53,6 +53,14 @@ public class VoucherController {
         return ResponseEntity.ok(updatedVoucher);
     }
 
+    @PutMapping("/vouchers/all-restaurants")
+    @ApiMessage("Update voucher and apply to all restaurants")
+    public ResponseEntity<resVoucherDTO> updateVoucherForAllRestaurants(@RequestBody Voucher voucher)
+            throws IdInvalidException {
+        resVoucherDTO updatedVoucher = voucherService.updateVoucherForAllRestaurants(voucher);
+        return ResponseEntity.ok(updatedVoucher);
+    }
+
     @GetMapping("/vouchers")
     @ApiMessage("Get all vouchers")
     public ResponseEntity<ResultPaginationDTO> getAllVouchers(

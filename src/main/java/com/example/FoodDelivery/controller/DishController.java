@@ -7,6 +7,7 @@ import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Dish;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
+import com.example.FoodDelivery.domain.res.restaurant.ResDishDTO;
 import com.example.FoodDelivery.service.DishService;
 import com.example.FoodDelivery.util.annotation.ApiMessage;
 import com.example.FoodDelivery.util.error.IdInvalidException;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -35,16 +37,16 @@ public class DishController {
 
     @PostMapping("/dishes")
     @ApiMessage("Create dish")
-    public ResponseEntity<Dish> createDish(@RequestBody Dish dish) throws IdInvalidException {
+    public ResponseEntity<ResDishDTO> createDish(@RequestBody Dish dish) throws IdInvalidException {
         Dish createdDish = dishService.createDish(dish);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdDish);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dishService.convertToResDishDTO(createdDish));
     }
 
     @PutMapping("/dishes")
-    @ApiMessage("Update dish")
-    public ResponseEntity<Dish> updateDish(@RequestBody Dish dish) throws IdInvalidException {
-        Dish updatedDish = dishService.updateDish(dish);
-        return ResponseEntity.ok(updatedDish);
+    @ApiMessage("Update dish with menu options")
+    public ResponseEntity<ResDishDTO> updateDish(@RequestBody ResDishDTO dto) throws IdInvalidException {
+        Dish updatedDish = dishService.updateDishWithMenuOptions(dto);
+        return ResponseEntity.ok(dishService.convertToResDishDTO(updatedDish));
     }
 
     @GetMapping("/dishes")
@@ -57,26 +59,32 @@ public class DishController {
 
     @GetMapping("/dishes/{id}")
     @ApiMessage("Get dish by id")
-    public ResponseEntity<Dish> getDishById(@PathVariable("id") Long id) throws IdInvalidException {
+    public ResponseEntity<ResDishDTO> getDishById(@PathVariable("id") Long id) throws IdInvalidException {
         Dish dish = dishService.getDishById(id);
         if (dish == null) {
             throw new IdInvalidException("Dish not found with id: " + id);
         }
-        return ResponseEntity.ok(dish);
+        return ResponseEntity.ok(dishService.convertToResDishDTO(dish));
     }
 
     @GetMapping("/dishes/restaurant/{restaurantId}")
     @ApiMessage("Get dishes by restaurant id")
-    public ResponseEntity<List<Dish>> getDishesByRestaurantId(@PathVariable("restaurantId") Long restaurantId) {
+    public ResponseEntity<List<ResDishDTO>> getDishesByRestaurantId(@PathVariable("restaurantId") Long restaurantId) {
         List<Dish> dishes = dishService.getDishesByRestaurantId(restaurantId);
-        return ResponseEntity.ok(dishes);
+        List<ResDishDTO> dishDTOs = dishes.stream()
+                .map(dishService::convertToResDishDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dishDTOs);
     }
 
     @GetMapping("/dishes/category/{categoryId}")
     @ApiMessage("Get dishes by category id")
-    public ResponseEntity<List<Dish>> getDishesByCategoryId(@PathVariable("categoryId") Long categoryId) {
+    public ResponseEntity<List<ResDishDTO>> getDishesByCategoryId(@PathVariable("categoryId") Long categoryId) {
         List<Dish> dishes = dishService.getDishesByCategoryId(categoryId);
-        return ResponseEntity.ok(dishes);
+        List<ResDishDTO> dishDTOs = dishes.stream()
+                .map(dishService::convertToResDishDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dishDTOs);
     }
 
     @DeleteMapping("/dishes/{id}")
