@@ -479,15 +479,15 @@
                 return;
             }
 
-            const socket = new SockJS(`${API_URL.replace('/api/v1', '')}/ws`);
+            // IMPORTANT: Token must be passed as query parameter for WebSocketAuthInterceptor
+            const wsUrl = `${API_URL.replace('/api/v1', '')}/ws?token=${accessToken}`;
+            console.log('Connecting to WebSocket:', wsUrl);
+
+            const socket = new SockJS(wsUrl);
             stompClient = Stomp.over(socket);
 
-            // Connect with authentication header
-            const connectHeaders = {
-                'Authorization': `Bearer ${accessToken}`
-            };
-
-            stompClient.connect(connectHeaders, function (frame) {
+            // No need for Authorization header - token is in URL
+            stompClient.connect({}, function (frame) {
                 console.log('Connected to WebSocket:', frame);
                 document.getElementById('chatStatus').textContent = 'Connected';
                 document.getElementById('chatStatus').className = 'connected';
@@ -497,15 +497,15 @@
                 document.getElementById('disconnectBtn').disabled = false;
                 document.getElementById('loadHistoryBtn').disabled = false;
 
-                // Subscribe to chat messages
-                stompClient.subscribe(`/topic/chat/order/${orderId}`, function (message) {
+                // Subscribe to USER-SPECIFIC chat messages queue
+                stompClient.subscribe(`/user/queue/chat/order/${orderId}`, function (message) {
                     console.log('Received message:', message.body);
                     const chatMsg = JSON.parse(message.body);
                     displayMessage(chatMsg);
                 });
 
-                // Subscribe to typing indicator
-                stompClient.subscribe(`/topic/chat/order/${orderId}/typing`, function (message) {
+                // Subscribe to USER-SPECIFIC typing indicator queue
+                stompClient.subscribe(`/user/queue/chat/order/${orderId}/typing`, function (message) {
                     const typingMsg = JSON.parse(message.body);
                     if (typingMsg.senderId != currentUser.id) {
                         showTypingIndicator();

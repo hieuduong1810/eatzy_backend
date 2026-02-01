@@ -452,14 +452,9 @@ public class DriverProfileService {
                     // Convert to DTO for WebSocket notification
                     ResOrderDTO orderDTO = orderService.convertToResOrderDTO(updatedOrder);
 
-                    // Notify driver about order assignment via WebSocket
-                    webSocketService.notifyDriverOrderAssigned(driver.getId(), orderDTO);
-
-                    // Notify customer about driver assignment
-                    webSocketService.notifyCustomerOrderUpdate(
-                            order.getCustomer().getId(),
-                            orderDTO,
-                            "A driver has been assigned to your order");
+                    // Notify driver about order assignment via WebSocket (using email)
+                    String driverEmail = driver.getEmail();
+                    webSocketService.notifyDriverOrderAssigned(driverEmail, orderDTO);
 
                     log.info("🎯 Successfully auto-assigned order {} to driver {}",
                             order.getId(), driver.getId());

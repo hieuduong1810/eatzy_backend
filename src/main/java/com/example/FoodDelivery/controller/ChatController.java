@@ -9,12 +9,18 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import com.example.FoodDelivery.domain.Order;
 import com.example.FoodDelivery.domain.res.websocket.ChatMessage;
 import com.example.FoodDelivery.service.ChatMessageService;
 import com.example.FoodDelivery.service.OrderService;
 
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Controller for handling WebSocket chat messages.
+ * Uses secure user-specific queues for private messaging between driver and
+ * customer.
+ */
 @Controller
 @Slf4j
 public class ChatController {
@@ -34,89 +40,75 @@ public class ChatController {
     /**
      * Handle chat messages sent from client
      * Endpoint: /app/chat/{orderId}
+     * 
+     * Uses secure user-specific queues to send messages only to authorized parties
+     * (driver and customer of the order).
      */
     @MessageMapping("/chat/{orderId}")
     public void handleChatMessage(@DestinationVariable("orderId") Long orderId,
             @Payload ChatMessage message,
             Principal principal) {
-        String authenticatedUser = principal != null ? principal.getName() : "anonymous";
-        log.info("Received chat message for order {} from authenticated user '{}': {} from {} ({})",
-                orderId, authenticatedUser, message.getMessage(), message.getSenderName(), message.getSenderType());
+        String authenticatedUser = principal != null ? principal.getName() : null;
+        log.info("Received chat message for order {} from user '{}': {}",
+                orderId, authenticatedUser, message.getMessage());
+
+        // Require authentication
+        if (authenticatedUser == null) {
+            log.warn("Unauthorized chat attempt - no authenticated user");
+            return;
+        }
 
         // Set timestamp
         message.setTimestamp(Instant.now());
         message.setOrderId(orderId);
 
         // Verify order exists
-        var order = orderService.getOrderById(orderId);
+        Order order = orderService.getOrderById(orderId);
         if (order == null) {
             log.error("Order {} not found", orderId);
             return;
         }
 
-        // ===== AUTHORIZATION CHECK =====
-        // Get user email from SecurityContext (more reliable than Principal for
-        // WebSocket with JWT)
-        String currentUserEmail = com.example.FoodDelivery.util.SecurityUtil.getCurrentUserLogin().orElse(null);
-
-        if (currentUserEmail == null) {
-            log.warn("No authenticated user found in SecurityContext for order {} chat. Principal: {}",
-                    orderId, authenticatedUser);
-            // For now, allow if we have a valid senderId in the message (backwards
-            // compatibility)
-            // In production, you might want to make this stricter
-        } else {
-            // Only check authorization if we have a valid user email
-            if (!isUserAuthorizedForOrder(currentUserEmail, order)) {
-                log.warn("Unauthorized chat access attempt: user '{}' tried to access order {} chat",
-                        currentUserEmail, orderId);
-                return;
-            }
-            log.debug("User {} authorized for order {} chat", currentUserEmail, orderId);
+        // Check authorization - only driver and customer of the order can chat
+        if (!isUserAuthorizedForOrder(authenticatedUser, order)) {
+            log.warn("Unauthorized chat access: user '{}' tried to access order {} chat",
+                    authenticatedUser, orderId);
+            return;
         }
 
-        // ===== QUEUE VERSION (Point-to-point - Private messaging) =====
-        // Issue: Requires proper user authentication with Principal
-        // Client must connect with {login: userId} header
-        /*
-         * // Send to driver via point-to-point queue (private message)
-         * if (order.getDriver() != null) {
-         * messagingTemplate.convertAndSendToUser(
-         * String.valueOf(order.getDriver().getId()),
-         * "/queue/chat/order/" + orderId,
-         * message);
-         * log.info("Sent chat message to driver {} via queue",
-         * order.getDriver().getId());
-         * }
-         * 
-         * // Send to customer via point-to-point queue (private message)
-         * if (order.getCustomer() != null) {
-         * messagingTemplate.convertAndSendToUser(
-         * String.valueOf(order.getCustomer().getId()),
-         * "/queue/chat/order/" + orderId,
-         * message);
-         * log.info("Sent chat message to customer {} via queue",
-         * order.getCustomer().getId());
-         * }
-         */
+        // Get emails for both parties
+        String customerEmail = order.getCustomer() != null ? order.getCustomer().getEmail() : null;
+        String driverEmail = order.getDriver() != null && order.getDriver().getDriverProfile() != null
+                ? order.getDriver().getEmail()
+                : null;
 
-        // ===== TOPIC VERSION (Broadcast - Simpler but less secure) =====
-        // Broadcast to all subscribers of this order's chat topic
-        // Anyone who subscribes to /topic/chat/order/{orderId} will receive the message
-        messagingTemplate.convertAndSend(
-                "/topic/chat/order/" + orderId,
-                message);
-        log.info("Broadcasted chat message to topic /topic/chat/order/{}", orderId);
+        // Send to customer via user-specific queue (if not the sender)
+        if (customerEmail != null) {
+            messagingTemplate.convertAndSendToUser(
+                    customerEmail,
+                    "/queue/chat/order/" + orderId,
+                    message);
+            log.debug("Sent chat message to customer: {}", customerEmail);
+        }
 
-        // ===== PERSIST MESSAGE (Database + Redis cache) =====
-        // Save message asynchronously to DB and cache to Redis
-        // This doesn't block the WebSocket broadcast
+        // Send to driver via user-specific queue (if assigned and not the sender)
+        if (driverEmail != null) {
+            messagingTemplate.convertAndSendToUser(
+                    driverEmail,
+                    "/queue/chat/order/" + orderId,
+                    message);
+            log.debug("Sent chat message to driver: {}", driverEmail);
+        }
+
+        log.info("Chat message delivered for order {} (customer: {}, driver: {})",
+                orderId, customerEmail, driverEmail);
+
+        // Persist message to database and cache
         try {
             chatMessageService.saveMessage(message);
             log.debug("Initiated message persistence for order {}", orderId);
         } catch (Exception e) {
             log.error("Failed to persist message for order {}: {}", orderId, e.getMessage(), e);
-            // Don't fail the broadcast even if persistence fails
         }
     }
 
@@ -128,74 +120,62 @@ public class ChatController {
     public void handleTypingIndicator(@DestinationVariable("orderId") Long orderId,
             @Payload ChatMessage message,
             Principal principal) {
-        String authenticatedUser = principal != null ? principal.getName() : "anonymous";
-        log.debug("Received typing indicator for order {} from authenticated user '{}'", orderId, authenticatedUser);
+        String authenticatedUser = principal != null ? principal.getName() : null;
 
-        var order = orderService.getOrderById(orderId);
+        if (authenticatedUser == null) {
+            return;
+        }
+
+        Order order = orderService.getOrderById(orderId);
         if (order == null) {
             return;
         }
 
-        // ===== QUEUE VERSION (Point-to-point) =====
-        /*
-         * // Broadcast typing indicator to the other party via queue
-         * if ("DRIVER".equals(message.getSenderType()) && order.getCustomer() != null)
-         * {
-         * messagingTemplate.convertAndSendToUser(
-         * String.valueOf(order.getCustomer().getId()),
-         * "/queue/chat/order/" + orderId + "/typing",
-         * message);
-         * } else if ("CUSTOMER".equals(message.getSenderType()) && order.getDriver() !=
-         * null) {
-         * messagingTemplate.convertAndSendToUser(
-         * String.valueOf(order.getDriver().getId()),
-         * "/queue/chat/order/" + orderId + "/typing",
-         * message);
-         * }
-         */
+        if (!isUserAuthorizedForOrder(authenticatedUser, order)) {
+            return;
+        }
 
-        // ===== TOPIC VERSION (Broadcast) =====
-        // Broadcast typing indicator to all subscribers of this order's chat
-        messagingTemplate.convertAndSend(
-                "/topic/chat/order/" + orderId + "/typing",
-                message);
-        log.debug("Broadcasted typing indicator to topic /topic/chat/order/{}/typing", orderId);
+        // Get the OTHER party's email (not the sender)
+        String targetEmail = null;
+
+        if ("DRIVER".equals(message.getSenderType())) {
+            // Driver is typing, notify customer
+            targetEmail = order.getCustomer() != null ? order.getCustomer().getEmail() : null;
+        } else if ("CUSTOMER".equals(message.getSenderType())) {
+            // Customer is typing, notify driver
+            targetEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        }
+
+        if (targetEmail != null) {
+            messagingTemplate.convertAndSendToUser(
+                    targetEmail,
+                    "/queue/chat/order/" + orderId + "/typing",
+                    message);
+            log.debug("Sent typing indicator to {} for order {}", targetEmail, orderId);
+        }
     }
 
     /**
      * Check if the authenticated user is authorized to access this order's chat
      * Only the customer and driver of the order can access the chat
-     * 
-     * @param authenticatedUserEmail email of the authenticated user
-     * @param order                  the order to check
-     * @return true if user is authorized, false otherwise
      */
-    private boolean isUserAuthorizedForOrder(String authenticatedUserEmail,
-            com.example.FoodDelivery.domain.Order order) {
-        if (authenticatedUserEmail == null || "anonymous".equals(authenticatedUserEmail)) {
-            log.warn("Anonymous user attempted to access order {} chat", order.getId());
+    private boolean isUserAuthorizedForOrder(String authenticatedUserEmail, Order order) {
+        if (authenticatedUserEmail == null) {
             return false;
         }
 
         // Check if user is the customer
         if (order.getCustomer() != null &&
                 authenticatedUserEmail.equals(order.getCustomer().getEmail())) {
-            log.debug("User {} authorized as customer for order {}", authenticatedUserEmail, order.getId());
             return true;
         }
 
         // Check if user is the driver
         if (order.getDriver() != null &&
                 authenticatedUserEmail.equals(order.getDriver().getEmail())) {
-            log.debug("User {} authorized as driver for order {}", authenticatedUserEmail, order.getId());
             return true;
         }
 
-        // User is neither customer nor driver
-        log.warn("User {} is not authorized for order {} (customer: {}, driver: {})",
-                authenticatedUserEmail, order.getId(),
-                order.getCustomer() != null ? order.getCustomer().getEmail() : "none",
-                order.getDriver() != null ? order.getDriver().getEmail() : "none");
         return false;
     }
 }

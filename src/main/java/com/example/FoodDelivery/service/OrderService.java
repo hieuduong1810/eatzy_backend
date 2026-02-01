@@ -842,8 +842,11 @@ public class OrderService {
         // Convert to DTO for response and WebSocket notification
         ResOrderDTO orderDTO = convertToResOrderDTO(savedOrder);
 
-        // Notify restaurant about new order via WebSocket
-        webSocketService.notifyRestaurantNewOrder(restaurant.getId(), orderDTO);
+        // Notify restaurant about new order via WebSocket (using owner email)
+        String restaurantOwnerEmail = restaurant.getOwner() != null ? restaurant.getOwner().getEmail() : null;
+        if (restaurantOwnerEmail != null) {
+            webSocketService.notifyRestaurantNewOrder(restaurantOwnerEmail, orderDTO);
+        }
 
         // Track user scoring for placing order
         userScoringService.trackPlaceOrder(customer, restaurant);
@@ -1047,8 +1050,9 @@ public class OrderService {
         // Convert to DTO for response
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify driver about order assignment via WebSocket
-        webSocketService.notifyDriverOrderAssigned(order.getDriver().getId(), orderDTO);
+        // Notify driver about order assignment via WebSocket (using email)
+        String driverEmail = order.getDriver().getEmail();
+        webSocketService.notifyDriverOrderAssigned(driverEmail, orderDTO);
 
         return orderDTO;
     }
@@ -1081,11 +1085,15 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer about order rejection
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer about order rejection (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Your order has been cancelled");
 
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1117,11 +1125,15 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer about order rejection by restaurant
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer about order rejection by restaurant (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Your order has been rejected by the restaurant");
 
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1144,12 +1156,16 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify driver and customer that order is ready for pickup
+        // Notify driver and customer that order is ready for pickup (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
         if (order.getDriver() != null) {
-            webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+            webSocketService.notifyCustomerOrderUpdate(customerEmail,
                     orderDTO, "Your order is ready for pickup");
         }
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1171,8 +1187,8 @@ public class OrderService {
         order.setPreparingAt(Instant.now());
         order = orderRepository.save(order);
 
-        // Notify customer about order acceptance
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer about order acceptance (using email)
+        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getEmail(),
                 convertToResOrderDTO(order), "Your order has been accepted and is being prepared");
 
         assignDriver(orderId);
@@ -1218,10 +1234,14 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer and restaurant about driver acceptance
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer and restaurant about driver acceptance (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Driver has accepted your order");
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1315,8 +1335,6 @@ public class OrderService {
             log.warn("No alternative drivers found in Redis GEO");
             order = orderRepository.save(order);
             ResOrderDTO orderDTO = convertToResOrderDTO(order);
-            webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
-                    orderDTO, "Looking for another driver for your order");
             return orderDTO;
         }
 
@@ -1338,8 +1356,6 @@ public class OrderService {
             order.setDriver(null);
             order = orderRepository.save(order);
             ResOrderDTO orderDTO = convertToResOrderDTO(order);
-            webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
-                    orderDTO, "Looking for another driver for your order");
             return orderDTO;
         }
 
@@ -1391,12 +1407,12 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer and restaurant about driver rejection and reassignment
+        // Notify customer and restaurant about driver rejection and reassignment (using
+        // email)
         if (order.getDriver() != null) {
-            webSocketService.notifyDriverOrderAssigned(order.getDriver().getId(), orderDTO);
+            String driverEmail = order.getDriver().getEmail();
+            webSocketService.notifyDriverOrderAssigned(driverEmail, orderDTO);
         }
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
-                orderDTO, "Looking for another driver for your order");
 
         return orderDTO;
     }
@@ -1433,10 +1449,14 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer about order pickup
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer about order pickup (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Your order has been picked up and is on the way");
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1473,10 +1493,14 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify customer about arrival
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify customer about arrival (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Your order has arrived!");
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
     }
@@ -1540,10 +1564,14 @@ public class OrderService {
 
         ResOrderDTO orderDTO = convertToResOrderDTO(order);
 
-        // Notify all parties about successful delivery
-        webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getId(),
+        // Notify all parties about successful delivery (using email)
+        String customerEmail = order.getCustomer().getEmail();
+        String restaurantEmail = order.getRestaurant().getOwner() != null ? order.getRestaurant().getOwner().getEmail()
+                : null;
+        String driverEmailNotify = order.getDriver() != null ? order.getDriver().getEmail() : null;
+        webSocketService.notifyCustomerOrderUpdate(customerEmail,
                 orderDTO, "Your order has been delivered successfully!");
-        webSocketService.broadcastOrderStatusChange(orderDTO);
+        webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmailNotify);
 
         // After delivery, try to find and assign the next suitable order for this
         // driver

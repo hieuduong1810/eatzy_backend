@@ -1,46 +1,41 @@
 # WebSocket Integration Guide
 
 ## Overview
-The backend now supports real-time features using WebSocket with STOMP protocol:
+The backend supports real-time features using WebSocket with STOMP protocol:
 - **Order Notifications** - Real-time order status updates for customers, restaurants, and drivers
 - **Chat System** - Private 1-on-1 chat between driver and customer for each order
 
+## 🔐 Authentication Required
+WebSocket connections now require JWT authentication. The token must be passed as a query parameter when connecting.
+
 ## WebSocket Endpoint
-- **Development**: `ws://localhost:8080/ws`
-- **Production**: `wss://eatzy-be.hoanduong.net/ws`
+- **Development**: `ws://localhost:8080/ws?token=YOUR_JWT_TOKEN`
+- **Production**: `wss://eatzy-be.hoanduong.net/ws?token=YOUR_JWT_TOKEN`
 
-## Topics & Queues
+## User-Specific Queues (Secure - Recommended)
 
-### Order Notifications (Broadcast via `/topic`)
+### Order Notifications
+All users subscribe to the same destination. Spring automatically routes messages to the correct user based on their authenticated email:
 
-#### Restaurant Notifications
-Subscribe to receive new orders and order status updates:
 ```
-/topic/restaurant/{restaurantId}/orders
-```
-
-#### Driver Notifications
-Subscribe to receive order assignments:
-```
-/topic/driver/{driverId}/orders
+/user/queue/orders
 ```
 
-#### Customer Notifications
-Subscribe to receive order status updates:
+**How it works:**
+1. Frontend connects with JWT token: `new SockJS('/ws?token=eyJhbGciOi...')`
+2. Backend validates token and extracts user email
+3. Frontend subscribes to: `/user/queue/orders`
+4. Backend sends to user via: `convertAndSendToUser(email, "/queue/orders", message)`
+5. Only that specific user receives the message
+
+### Driver Location Updates
 ```
-/topic/customer/{customerId}/orders
+/user/queue/driver-location
 ```
 
-### Chat System (Private via `/queue`)
+### Chat System
 
-#### Driver Chat Queue
-Subscribe to receive chat messages from customer:
-```
-/user/queue/chat/order/{orderId}
-```
-
-#### Customer Chat Queue
-Subscribe to receive chat messages from driver:
+#### Chat Messages
 ```
 /user/queue/chat/order/{orderId}
 ```
@@ -48,6 +43,16 @@ Subscribe to receive chat messages from driver:
 #### Typing Indicators
 ```
 /user/queue/chat/order/{orderId}/typing
+```
+
+## Legacy Topics (Deprecated - Not Secure)
+
+> ⚠️ **Warning**: These topic-based subscriptions are deprecated and insecure. Anyone who knows the ID can subscribe. Use user-specific queues instead.
+
+```
+/topic/restaurant/{restaurantId}/orders  (DEPRECATED)
+/topic/driver/{driverId}/orders          (DEPRECATED)
+/topic/customer/{customerId}/orders      (DEPRECATED)
 ```
 
 ## Message Formats
@@ -84,20 +89,29 @@ Subscribe to receive chat messages from driver:
 npm install sockjs-client @stomp/stompjs
 ```
 
-### 2. React Example - Order Notifications
+### 2. React Example - Secure Order Notifications (Recommended)
 
 ```javascript
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 import { useEffect, useState } from 'react';
 
-function OrderNotifications({ userType, userId }) {
+function OrderNotifications() {
   const [notifications, setNotifications] = useState([]);
+  const [connected, setConnected] = useState(false);
   const [client, setClient] = useState(null);
 
+  // Get JWT token from your auth context/storage
+  const accessToken = localStorage.getItem('access_token');
+
   useEffect(() => {
-    // Create WebSocket connection
-    const socket = new SockJS('http://localhost:8080/ws');
+    if (!accessToken) {
+      console.error('No access token available');
+      return;
+    }
+
+    // Create WebSocket connection WITH JWT token
+    const socket = new SockJS(`http://localhost:8080/ws?token=${accessToken}`);
     
     const stompClient = new Client({
       webSocketFactory: () => socket,
@@ -107,29 +121,36 @@ function OrderNotifications({ userType, userId }) {
       heartbeatOutgoing: 4000,
       
       onConnect: () => {
-        console.log('Connected to WebSocket');
+        console.log('✅ Connected to WebSocket');
+        setConnected(true);
         
-        // Subscribe to appropriate topic based on user type
-        let topic;
-        if (userType === 'restaurant') {
-          topic = `/topic/restaurant/${userId}/orders`;
-        } else if (userType === 'driver') {
-          topic = `/topic/driver/${userId}/orders`;
-        } else if (userType === 'customer') {
-          topic = `/topic/customer/${userId}/orders`;
-        }
-        
-        stompClient.subscribe(topic, (message) => {
+        // Subscribe to user-specific queue
+        // NO ID NEEDED! Spring routes to correct user based on JWT
+        stompClient.subscribe('/user/queue/orders', (message) => {
           const notification = JSON.parse(message.body);
-          console.log('Received notification:', notification);
-          
-          // Handle notification based on type
+          console.log('📩 Received notification:', notification);
           handleNotification(notification);
+        });
+
+        // Subscribe to driver location updates (for customers)
+        stompClient.subscribe('/user/queue/driver-location', (message) => {
+          const location = JSON.parse(message.body);
+          console.log('📍 Driver location:', location);
+          updateDriverLocation(location);
         });
       },
       
+      onDisconnect: () => {
+        console.log('❌ Disconnected from WebSocket');
+        setConnected(false);
+      },
+      
       onStompError: (frame) => {
-        console.error('STOMP error:', frame);
+        console.error('WebSocket error:', frame);
+        // Token might be invalid - redirect to login
+        if (frame.headers?.message?.includes('rejected')) {
+          window.location.href = '/login';
+        }
       }
     });
 
@@ -142,29 +163,27 @@ function OrderNotifications({ userType, userId }) {
         stompClient.deactivate();
       }
     };
-  }, [userType, userId]);
+  }, [accessToken]);
 
   const handleNotification = (notification) => {
     setNotifications(prev => [...prev, notification]);
     
-    // Show notification toast
+    // Show notification toast based on type
     switch(notification.type) {
       case 'NEW_ORDER':
-        showToast('New order received!', notification.message);
-        // Play notification sound
+        showToast('🆕 New order received!', notification.message);
         playNotificationSound();
-        // Update order list
         refreshOrders();
         break;
         
       case 'ORDER_ASSIGNED':
-        showModal('New Order Assignment', notification.data);
+        showModal('📦 New Order Assignment', notification.data);
         playNotificationSound();
         break;
         
       case 'ORDER_UPDATE':
       case 'ORDER_STATUS_CHANGED':
-        showToast('Order Update', notification.message);
+        showToast('📋 Order Update', notification.message);
         updateOrderStatus(notification.orderId, notification.data);
         break;
     }
@@ -172,6 +191,7 @@ function OrderNotifications({ userType, userId }) {
 
   return (
     <div>
+      <span>Status: {connected ? '🟢 Connected' : '🔴 Disconnected'}</span>
       {/* Your UI components */}
     </div>
   );
