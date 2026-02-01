@@ -181,4 +181,30 @@ public class RestaurantController {
         response.put("status", restaurant.getStatus());
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/restaurants/my-restaurant")
+    @ApiMessage("Get current owner's restaurant details")
+    public ResponseEntity<ResRestaurantDTO> getMyRestaurant() throws IdInvalidException {
+        Restaurant restaurant = restaurantService.getCurrentOwnerRestaurant();
+        ResRestaurantDTO restaurantDTO = restaurantService.getRestaurantDTOById(restaurant.getId());
+        if (restaurantDTO == null) {
+            throw new IdInvalidException("Restaurant not found");
+        }
+        return ResponseEntity.ok(restaurantDTO);
+    }
+
+    @PutMapping("/restaurants/my-restaurant")
+    @ApiMessage("Update current owner's restaurant")
+    public ResponseEntity<ResRestaurantDTO> updateMyRestaurant(@RequestBody Restaurant restaurant)
+            throws IdInvalidException {
+        // Get the restaurant owned by current logged-in user
+        Restaurant currentRestaurant = restaurantService.getCurrentOwnerRestaurant();
+
+        // Set the ID from the current owner's restaurant to ensure they can only update
+        // their own
+        restaurant.setId(currentRestaurant.getId());
+
+        ResRestaurantDTO updatedRestaurant = restaurantService.updateRestaurantDTO(restaurant);
+        return ResponseEntity.ok(updatedRestaurant);
+    }
 }
