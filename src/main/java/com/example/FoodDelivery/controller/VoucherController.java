@@ -93,16 +93,8 @@ public class VoucherController {
     @GetMapping("/vouchers/restaurant/{restaurantId}")
     @ApiMessage("Get vouchers by restaurant id")
     public ResponseEntity<List<resVoucherDTO>> getVouchersByRestaurantId(
-            @PathVariable("restaurantId") Long restaurantId) {
+            @PathVariable("restaurantId") Long restaurantId) throws IdInvalidException {
         List<resVoucherDTO> vouchers = voucherService.getVouchersByRestaurantId(restaurantId);
-        return ResponseEntity.ok(vouchers);
-    }
-
-    @GetMapping("/vouchers/available/order/{orderId}")
-    @ApiMessage("Get available vouchers for order")
-    public ResponseEntity<List<resVoucherDTO>> getAvailableVouchersForOrder(
-            @PathVariable("orderId") Long orderId) throws IdInvalidException {
-        List<resVoucherDTO> vouchers = voucherService.getAvailableVouchersForOrder(orderId);
         return ResponseEntity.ok(vouchers);
     }
 

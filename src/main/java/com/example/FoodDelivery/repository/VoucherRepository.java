@@ -25,10 +25,8 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long>, JpaSpec
         @Query("SELECT DISTINCT v FROM Voucher v LEFT JOIN v.restaurants r WHERE " +
                         "(r.id = :restaurantId OR v.restaurants IS EMPTY) AND " +
                         "v.startDate <= :currentTime AND v.endDate >= :currentTime AND " +
-                        "v.minOrderValue <= :orderValue AND " +
                         "v.remainingQuantity > 0")
         List<Voucher> findAvailableVouchersForOrder(
                         @Param("restaurantId") Long restaurantId,
-                        @Param("orderValue") BigDecimal orderValue,
                         @Param("currentTime") Instant currentTime);
 }

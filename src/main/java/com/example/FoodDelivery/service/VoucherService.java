@@ -118,10 +118,48 @@ public class VoucherService {
         return convertToResVoucherDTO(voucherOpt.orElse(null));
     }
 
-    public List<resVoucherDTO> getVouchersByRestaurantId(Long restaurantId) {
-        List<Voucher> vouchers = this.voucherRepository.findByRestaurantId(restaurantId);
-        return vouchers.stream()
-                .map(this::convertToResVoucherDTO)
+    public List<resVoucherDTO> getVouchersByRestaurantId(Long restaurantId) throws IdInvalidException {
+
+        // Lấy người dùng đang đăng nhập từ SecurityUtil
+        String email = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("User not authenticated"));
+        User currentUser = this.userRepository.findByEmail(email);
+        if (currentUser == null) {
+            throw new IdInvalidException("User not found with email: " + email);
+        }
+
+        Long customerId = currentUser.getId();
+        Instant currentTime = Instant.now();
+
+        // Get all potentially available vouchers
+        List<Voucher> vouchers = this.voucherRepository.findAvailableVouchersForOrder(
+                restaurantId, currentTime);
+
+        // Filter vouchers based on active status and usage limit per user
+        List<Voucher> availableVouchers = vouchers.stream()
+                .filter(voucher -> {
+                    // Check if voucher is active
+                    if (voucher.getActive() == null || !voucher.getActive()) {
+                        return false;
+                    }
+
+                    // If no usage limit, voucher is available
+                    if (voucher.getUsageLimitPerUser() == null) {
+                        return true;
+                    }
+
+                    // Count how many times customer has used this voucher
+                    Long usageCount = this.orderRepository.countByCustomerIdAndVoucherId(
+                            customerId, voucher.getId());
+
+                    // Check if customer hasn't reached the limit
+                    return usageCount < voucher.getUsageLimitPerUser();
+                })
+                .collect(Collectors.toList());
+
+        // Convert to DTOs with user-specific remaining usage
+        return availableVouchers.stream()
+                .map(voucher -> convertToResVoucherDTO(voucher, customerId))
                 .collect(Collectors.toList());
     }
 
@@ -335,55 +373,4 @@ public class VoucherService {
         return convertToResVoucherDTO(savedVoucher);
     }
 
-    public List<resVoucherDTO> getAvailableVouchersForOrder(Long orderId) throws IdInvalidException {
-        // Get order details
-        Order order = this.orderRepository.findById(orderId)
-                .orElseThrow(() -> new IdInvalidException("Order not found with id: " + orderId));
-
-        if (order.getRestaurant() == null) {
-            throw new IdInvalidException("Order must have a restaurant");
-        }
-        if (order.getCustomer() == null) {
-            throw new IdInvalidException("Order must have a customer");
-        }
-        if (order.getSubtotal() == null) {
-            throw new IdInvalidException("Order must have a subtotal");
-        }
-
-        Long restaurantId = order.getRestaurant().getId();
-        Long customerId = order.getCustomer().getId();
-        BigDecimal orderValue = order.getSubtotal();
-        Instant currentTime = Instant.now();
-
-        // Get all potentially available vouchers
-        List<Voucher> vouchers = this.voucherRepository.findAvailableVouchersForOrder(
-                restaurantId, orderValue, currentTime);
-
-        // Filter vouchers based on active status and usage limit per user
-        List<Voucher> availableVouchers = vouchers.stream()
-                .filter(voucher -> {
-                    // Check if voucher is active
-                    if (voucher.getActive() == null || !voucher.getActive()) {
-                        return false;
-                    }
-
-                    // If no usage limit, voucher is available
-                    if (voucher.getUsageLimitPerUser() == null) {
-                        return true;
-                    }
-
-                    // Count how many times customer has used this voucher
-                    Long usageCount = this.orderRepository.countByCustomerIdAndVoucherId(
-                            customerId, voucher.getId());
-
-                    // Check if customer hasn't reached the limit
-                    return usageCount < voucher.getUsageLimitPerUser();
-                })
-                .collect(Collectors.toList());
-
-        // Convert to DTOs with user-specific remaining usage
-        return availableVouchers.stream()
-                .map(voucher -> convertToResVoucherDTO(voucher, customerId))
-                .collect(Collectors.toList());
-    }
 }
