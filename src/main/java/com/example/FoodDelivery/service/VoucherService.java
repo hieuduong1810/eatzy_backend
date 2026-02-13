@@ -191,6 +191,28 @@ public class VoucherService {
         return convertToResVoucherDTO(savedVoucher);
     }
 
+    /**
+     * Create new voucher and apply to ALL restaurants in the system
+     */
+    public resVoucherDTO createVoucherForAllRestaurants(Voucher voucher) throws IdInvalidException {
+        // check code exists
+        if (this.voucherRepository.existsByCode(voucher.getCode())) {
+            throw new IdInvalidException("Voucher code already exists: " + voucher.getCode());
+        }
+
+        // Set remainingQuantity = totalQuantity when creating new voucher
+        if (voucher.getTotalQuantity() != null) {
+            voucher.setRemainingQuantity(voucher.getTotalQuantity());
+        }
+
+        // Lấy tất cả restaurants và áp dụng cho voucher
+        List<Restaurant> allRestaurants = this.restaurantRepository.findAll();
+        voucher.setRestaurants(allRestaurants);
+
+        Voucher savedVoucher = voucherRepository.save(voucher);
+        return convertToResVoucherDTO(savedVoucher);
+    }
+
     public resVoucherDTO updateVoucher(Voucher voucher) throws IdInvalidException {
         // check id
         Voucher currentVoucher = this.voucherRepository.findById(voucher.getId()).orElse(null);
