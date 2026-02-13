@@ -256,7 +256,7 @@ public class OrderEarningsSummaryService {
                 && summary.getDriverNetEarning().compareTo(BigDecimal.ZERO) > 0) {
             Wallet driverWallet = walletService.getWalletByUserId(summary.getDriver().getId());
             if (driverWallet != null) {
-                walletService.addBalance(driverWallet.getId(), summary.getDriverNetEarning());
+                driverWallet = walletService.addBalance(driverWallet.getId(), summary.getDriverNetEarning());
 
                 // Create transaction record
                 WalletTransaction driverTransaction = WalletTransaction.builder()
@@ -284,7 +284,8 @@ public class OrderEarningsSummaryService {
             if (restaurantOwner != null) {
                 Wallet restaurantWallet = walletService.getWalletByUserId(restaurantOwner.getId());
                 if (restaurantWallet != null) {
-                    walletService.addBalance(restaurantWallet.getId(), summary.getRestaurantNetEarning());
+                    restaurantWallet = walletService.addBalance(restaurantWallet.getId(),
+                            summary.getRestaurantNetEarning());
 
                     // Create transaction record
                     WalletTransaction restaurantTransaction = WalletTransaction.builder()
@@ -315,7 +316,7 @@ public class OrderEarningsSummaryService {
                 if (adminWallet != null) {
                     // Check if admin has enough balance
                     if (adminWallet.getBalance().compareTo(totalCommission) >= 0) {
-                        walletService.subtractBalance(adminWallet.getId(), totalCommission);
+                        adminWallet = walletService.subtractBalance(adminWallet.getId(), totalCommission);
 
                         // Create transaction record
                         WalletTransaction adminTransaction = WalletTransaction.builder()
