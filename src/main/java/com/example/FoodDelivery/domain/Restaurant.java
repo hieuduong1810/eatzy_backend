@@ -65,7 +65,8 @@ public class Restaurant {
     @Column(name = "five_star_count")
     private Integer fiveStarCount;
 
-    private String schedule; // e.g., "09:00-21:00"
+    @Column(columnDefinition = "TEXT")
+    private String schedule; // e.g., "09:00-21:00" or JSON format for complex schedules
 
     @Column(name = "avatar_url")
     private String avatarUrl; // Profile image

@@ -14,6 +14,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
 
     List<Review> findByOrderId(Long orderId);
 
+    List<Review> findByOrderIdAndReviewTarget(Long orderId, String reviewTarget);
+
     List<Review> findByReviewTargetAndTargetName(String reviewTarget, String targetName);
 
     // Report queries

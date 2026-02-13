@@ -125,10 +125,13 @@ public class ReviewService {
             if (!order.getCustomer().getId().equals(customer.getId())) {
                 throw new IdInvalidException("You are not allowed to review this order");
             }
-            // check if this order has already been reviewed by this customer
-            List<Review> existingReviews = this.reviewRepository.findByOrderId(order.getId());
+            // check if this order has already been reviewed by this customer for this
+            // target
+            List<Review> existingReviews = this.reviewRepository.findByOrderIdAndReviewTarget(order.getId(),
+                    review.getReviewTarget());
             if (!existingReviews.isEmpty()) {
-                throw new IdInvalidException("You have already reviewed this order");
+                throw new IdInvalidException(
+                        "You have already reviewed this " + review.getReviewTarget() + " for this order");
             }
             // check order status
             if (!"DELIVERED".equals(order.getOrderStatus())) {
@@ -170,11 +173,12 @@ public class ReviewService {
         // update rating based on review target
         if (reviewTarget.equals("restaurant")) {
             updateRestaurantRating(savedReview.getTargetName());
-            
+
             // Track user scoring for restaurant rating
             Restaurant restaurant = review.getOrder().getRestaurant();
             userScoringService.trackRating(customer, restaurant, review.getRating());
-            log.info("⭐ User {} rated restaurant {} with {} stars", customer.getId(), restaurant.getId(), review.getRating());
+            log.info("⭐ User {} rated restaurant {} with {} stars", customer.getId(), restaurant.getId(),
+                    review.getRating());
         } else if (reviewTarget.equals("driver")) {
             updateDriverRating(savedReview.getTargetName());
         }

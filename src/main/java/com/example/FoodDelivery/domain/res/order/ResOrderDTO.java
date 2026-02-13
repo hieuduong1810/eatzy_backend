@@ -77,6 +77,7 @@ public class ResOrderDTO {
     public static class Restaurant {
         private long id;
         private String name;
+        private String slug;
         private String address;
         private String imageUrl;
         private BigDecimal latitude;

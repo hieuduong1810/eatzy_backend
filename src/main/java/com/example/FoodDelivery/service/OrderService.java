@@ -159,6 +159,7 @@ public class OrderService {
             ResOrderDTO.Restaurant restaurant = new ResOrderDTO.Restaurant();
             restaurant.setId(order.getRestaurant().getId());
             restaurant.setName(order.getRestaurant().getName());
+            restaurant.setSlug(order.getRestaurant().getSlug());
             restaurant.setAddress(order.getRestaurant().getAddress());
             restaurant.setImageUrl(order.getRestaurant().getAvatarUrl());
             restaurant.setLatitude(order.getRestaurant().getLatitude());
