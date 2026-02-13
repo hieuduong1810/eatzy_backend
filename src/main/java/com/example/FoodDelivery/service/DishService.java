@@ -16,6 +16,7 @@ import com.example.FoodDelivery.domain.DishCategory;
 import com.example.FoodDelivery.domain.MenuOption;
 import com.example.FoodDelivery.domain.MenuOptionGroup;
 import com.example.FoodDelivery.domain.Restaurant;
+import com.example.FoodDelivery.domain.req.ReqDishDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResDishDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResMenuOptionGroupDTO;
@@ -205,17 +206,93 @@ public class DishService {
     }
 
     /**
+     * Create dish with nested menuOptionGroups and menuOptions
+     * Restaurant is automatically determined from current logged-in user (owner)
+     * - Group/option id should be null for creation
+     */
+    @Transactional
+    public Dish createDishWithMenuOptions(ReqDishDTO dto) throws IdInvalidException {
+        // Get restaurant from current logged-in owner
+        Restaurant restaurant = this.restaurantService.getCurrentOwnerRestaurant();
+
+        // Check duplicate name in restaurant
+        if (dto.getName() != null && this.existsByNameAndRestaurantId(dto.getName(), restaurant.getId())) {
+            throw new IdInvalidException("Dish name already exists in this restaurant: " + dto.getName());
+        }
+
+        // Create new dish
+        Dish dish = new Dish();
+        dish.setRestaurant(restaurant);
+        dish.setName(dto.getName());
+        dish.setDescription(dto.getDescription());
+        dish.setPrice(dto.getPrice());
+        dish.setImageUrl(dto.getImageUrl());
+        dish.setAvailabilityQuantity(dto.getAvailabilityQuantity());
+
+        // Handle category if provided
+        if (dto.getCategory() != null && dto.getCategory().getId() != null) {
+            DishCategory category = this.dishCategoryService.getDishCategoryById(dto.getCategory().getId());
+            if (category == null) {
+                throw new IdInvalidException("Category not found with id: " + dto.getCategory().getId());
+            }
+            if (!category.getRestaurant().getId().equals(restaurant.getId())) {
+                throw new IdInvalidException("Category does not belong to your restaurant");
+            }
+            dish.setCategory(category);
+        }
+
+        // Save dish first
+        dish = dishRepository.save(dish);
+
+        // Handle menuOptionGroups
+        if (dto.getMenuOptionGroups() != null && !dto.getMenuOptionGroups().isEmpty()) {
+            for (ReqDishDTO.MenuOptionGroup groupDTO : dto.getMenuOptionGroups()) {
+                MenuOptionGroup group = new MenuOptionGroup();
+                group.setDish(dish);
+                group.setGroupName(groupDTO.getGroupName());
+                group.setMinChoices(groupDTO.getMinChoices());
+                group.setMaxChoices(groupDTO.getMaxChoices());
+                group = menuOptionGroupRepository.save(group);
+
+                // Handle menuOptions within this group
+                if (groupDTO.getMenuOptions() != null && !groupDTO.getMenuOptions().isEmpty()) {
+                    for (ReqDishDTO.MenuOptionGroup.MenuOption optionDTO : groupDTO.getMenuOptions()) {
+                        MenuOption option = new MenuOption();
+                        option.setMenuOptionGroup(group);
+                        option.setName(optionDTO.getName());
+                        option.setPriceAdjustment(optionDTO.getPriceAdjustment());
+                        option.setIsAvailable(optionDTO.getIsAvailable() != null ? optionDTO.getIsAvailable() : true);
+                        menuOptionRepository.save(option);
+                    }
+                }
+            }
+        }
+
+        // Refresh and return the dish
+        return getDishById(dish.getId());
+    }
+
+    /**
      * Update dish with nested menuOptionGroups and menuOptions
+     * Restaurant is automatically determined from current logged-in user (owner)
      * - If group/option id is null -> create new
      * - If group/option id exists -> update
      * - Groups/options not in request will be deleted
      */
     @Transactional
-    public Dish updateDishWithMenuOptions(ResDishDTO dto) throws IdInvalidException {
+    public Dish updateDishWithMenuOptions(ReqDishDTO dto) throws IdInvalidException {
+        // Get restaurant from current logged-in owner
+        Restaurant restaurant = this.restaurantService.getCurrentOwnerRestaurant();
+
         // Check dish exists
         Dish currentDish = getDishById(dto.getId());
         if (currentDish == null) {
             throw new IdInvalidException("Dish not found with id: " + dto.getId());
+        }
+
+        // Verify dish belongs to current user's restaurant
+        if (!currentDish.getRestaurant().getId().equals(restaurant.getId())) {
+            throw new IdInvalidException("You can only update dishes in your own restaurant");
         }
 
         // Update basic dish fields
@@ -240,6 +317,18 @@ public class DishService {
             currentDish.setAvailabilityQuantity(dto.getAvailabilityQuantity());
         }
 
+        // Handle category if provided
+        if (dto.getCategory() != null && dto.getCategory().getId() != null) {
+            DishCategory category = this.dishCategoryService.getDishCategoryById(dto.getCategory().getId());
+            if (category == null) {
+                throw new IdInvalidException("Category not found with id: " + dto.getCategory().getId());
+            }
+            if (!category.getRestaurant().getId().equals(restaurant.getId())) {
+                throw new IdInvalidException("Category does not belong to your restaurant");
+            }
+            currentDish.setCategory(category);
+        }
+
         // Save dish first to ensure it exists for relationships
         currentDish = dishRepository.save(currentDish);
 
@@ -249,7 +338,7 @@ public class DishService {
             List<MenuOptionGroup> existingGroups = menuOptionGroupRepository.findByDishId(currentDish.getId());
             Set<Long> requestGroupIds = new HashSet<>();
 
-            for (ResMenuOptionGroupDTO groupDTO : dto.getMenuOptionGroups()) {
+            for (ReqDishDTO.MenuOptionGroup groupDTO : dto.getMenuOptionGroups()) {
                 MenuOptionGroup group;
 
                 if (groupDTO.getId() == null) {
@@ -265,8 +354,8 @@ public class DishService {
                     }
                 }
 
-                if (groupDTO.getName() != null) {
-                    group.setGroupName(groupDTO.getName());
+                if (groupDTO.getGroupName() != null) {
+                    group.setGroupName(groupDTO.getGroupName());
                 }
                 if (groupDTO.getMinChoices() != null) {
                     group.setMinChoices(groupDTO.getMinChoices());
@@ -282,7 +371,7 @@ public class DishService {
                     List<MenuOption> existingOptions = menuOptionRepository.findByMenuOptionGroupId(group.getId());
                     Set<Long> requestOptionIds = new HashSet<>();
 
-                    for (ResMenuOptionDTO optionDTO : groupDTO.getMenuOptions()) {
+                    for (ReqDishDTO.MenuOptionGroup.MenuOption optionDTO : groupDTO.getMenuOptions()) {
                         MenuOption option;
 
                         if (optionDTO.getId() == null) {
@@ -304,7 +393,9 @@ public class DishService {
                         if (optionDTO.getPriceAdjustment() != null) {
                             option.setPriceAdjustment(optionDTO.getPriceAdjustment());
                         }
-                        option.setIsAvailable(optionDTO.isAvailable());
+                        if (optionDTO.getIsAvailable() != null) {
+                            option.setIsAvailable(optionDTO.getIsAvailable());
+                        }
 
                         menuOptionRepository.save(option);
                     }

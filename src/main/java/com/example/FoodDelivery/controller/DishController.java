@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.turkraft.springfilter.boot.Filter;
 
 import com.example.FoodDelivery.domain.Dish;
+import com.example.FoodDelivery.domain.req.ReqDishDTO;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.restaurant.ResDishDTO;
 import com.example.FoodDelivery.service.DishService;
@@ -36,15 +37,15 @@ public class DishController {
     }
 
     @PostMapping("/dishes")
-    @ApiMessage("Create dish")
-    public ResponseEntity<ResDishDTO> createDish(@RequestBody Dish dish) throws IdInvalidException {
-        Dish createdDish = dishService.createDish(dish);
+    @ApiMessage("Create dish with menu options")
+    public ResponseEntity<ResDishDTO> createDish(@RequestBody ReqDishDTO dto) throws IdInvalidException {
+        Dish createdDish = dishService.createDishWithMenuOptions(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(dishService.convertToResDishDTO(createdDish));
     }
 
     @PutMapping("/dishes")
     @ApiMessage("Update dish with menu options")
-    public ResponseEntity<ResDishDTO> updateDish(@RequestBody ResDishDTO dto) throws IdInvalidException {
+    public ResponseEntity<ResDishDTO> updateDish(@RequestBody ReqDishDTO dto) throws IdInvalidException {
         Dish updatedDish = dishService.updateDishWithMenuOptions(dto);
         return ResponseEntity.ok(dishService.convertToResDishDTO(updatedDish));
     }
