@@ -68,6 +68,7 @@ public class CartService {
             restaurant.setId(cart.getRestaurant().getId());
             restaurant.setName(cart.getRestaurant().getName());
             restaurant.setAddress(cart.getRestaurant().getAddress());
+            restaurant.setImageUrl(cart.getRestaurant().getAvatarUrl());
             dto.setRestaurant(restaurant);
         }
 
@@ -274,13 +275,14 @@ public class CartService {
     @Transactional
     public ResCartDTO saveOrUpdateCart(ReqCartDTO reqCartDTO) throws IdInvalidException {
         // Get current user from security context
-        String email = SecurityUtil.getCurrentUserLogin().isPresent() 
-                ? SecurityUtil.getCurrentUserLogin().get() : "";
-        
+        String email = SecurityUtil.getCurrentUserLogin().isPresent()
+                ? SecurityUtil.getCurrentUserLogin().get()
+                : "";
+
         if (email.isEmpty()) {
             throw new IdInvalidException("User not authenticated");
         }
-        
+
         User customer = this.userService.handleGetUserByUsername(email);
         if (customer == null) {
             throw new IdInvalidException("Customer not found with email: " + email);
