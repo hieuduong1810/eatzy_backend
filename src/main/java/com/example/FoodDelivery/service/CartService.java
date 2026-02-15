@@ -126,7 +126,9 @@ public class CartService {
                             }
                         }
 
-                        itemDto.setTotalPrice(totalPrice);
+                        // Multiply by quantity to get total price for this cart item
+                        itemDto.setTotalPrice(
+                                totalPrice.multiply(java.math.BigDecimal.valueOf(cartItem.getQuantity())));
 
                         return itemDto;
                     })
