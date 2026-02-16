@@ -20,12 +20,18 @@ public class DriverLocationController {
 
     private final RedisGeoService redisGeoService;
     private final UserService userService;
+    private final com.example.FoodDelivery.repository.OrderRepository orderRepository;
+    private final com.example.FoodDelivery.service.WebSocketService webSocketService;
 
     public DriverLocationController(
             RedisGeoService redisGeoService,
-            UserService userService) {
+            UserService userService,
+            com.example.FoodDelivery.repository.OrderRepository orderRepository,
+            com.example.FoodDelivery.service.WebSocketService webSocketService) {
         this.redisGeoService = redisGeoService;
         this.userService = userService;
+        this.orderRepository = orderRepository;
+        this.webSocketService = webSocketService;
     }
 
     /**
@@ -64,5 +70,19 @@ public class DriverLocationController {
                 driver.getId(),
                 locationUpdate.getLatitude(),
                 locationUpdate.getLongitude());
+
+        // Broadcast to customer if driver has active order
+        try {
+            java.util.List<String> activeStatuses = java.util.List.of("DRIVER_ASSIGNED", "On the way to restaurant",
+                    "Arrived at restaurant", "Picked up order", "DELIVERING", "Arrived at delivery location");
+            com.example.FoodDelivery.domain.Order activeOrder = orderRepository
+                    .findFirstByDriverIdAndOrderStatusIn(driver.getId(), activeStatuses);
+
+            if (activeOrder != null && activeOrder.getCustomer() != null) {
+                webSocketService.sendDriverLocationToCustomer(activeOrder.getCustomer().getEmail(), locationUpdate);
+            }
+        } catch (Exception e) {
+            log.error("Failed to broadcast driver location to customer", e);
+        }
     }
 }

@@ -27,12 +27,18 @@ public class RedisTestController {
 
         private final RedisCacheService redisCacheService;
         private final RedisGeoService redisGeoService;
+        private final com.example.FoodDelivery.repository.OrderRepository orderRepository;
+        private final com.example.FoodDelivery.service.WebSocketService webSocketService;
 
         public RedisTestController(
                         RedisCacheService redisCacheService,
-                        RedisGeoService redisGeoService) {
+                        RedisGeoService redisGeoService,
+                        com.example.FoodDelivery.repository.OrderRepository orderRepository,
+                        com.example.FoodDelivery.service.WebSocketService webSocketService) {
                 this.redisCacheService = redisCacheService;
                 this.redisGeoService = redisGeoService;
+                this.orderRepository = orderRepository;
+                this.webSocketService = webSocketService;
         }
 
         // ============ CACHE DEMO ============
@@ -90,6 +96,26 @@ public class RedisTestController {
                 java.math.BigDecimal longitude = new java.math.BigDecimal(request.get("longitude").toString());
 
                 redisGeoService.updateDriverLocation(driverId, latitude, longitude);
+
+                // Broadcast to customer if driver has active order
+                try {
+                        java.util.List<String> activeStatuses = java.util.List.of("DRIVER_ASSIGNED",
+                                        "On the way to restaurant",
+                                        "Arrived at restaurant", "Picked up order", "DELIVERING",
+                                        "Arrived at delivery location");
+                        com.example.FoodDelivery.domain.Order activeOrder = orderRepository
+                                        .findFirstByDriverIdAndOrderStatusIn(driverId, activeStatuses);
+
+                        if (activeOrder != null && activeOrder.getCustomer() != null) {
+                                com.example.FoodDelivery.domain.res.websocket.DriverLocationUpdate locationUpdate = new com.example.FoodDelivery.domain.res.websocket.DriverLocationUpdate(
+                                                latitude, longitude, java.time.Instant.now());
+                                webSocketService.sendDriverLocationToCustomer(activeOrder.getCustomer().getEmail(),
+                                                locationUpdate);
+                        }
+                } catch (Exception e) {
+                        // Log error but don't fail the response
+                        System.err.println("Failed to broadcast driver location: " + e.getMessage());
+                }
 
                 return ResponseEntity.ok(Map.of(
                                 "message", "Driver location updated",
