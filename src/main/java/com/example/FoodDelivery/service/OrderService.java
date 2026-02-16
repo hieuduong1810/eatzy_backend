@@ -1164,7 +1164,7 @@ public class OrderService {
         String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
         if (order.getDriver() != null) {
             webSocketService.notifyCustomerOrderUpdate(customerEmail,
-                    orderDTO, "Your order is ready for pickup");
+                    orderDTO, "Đơn hàng của bạn đã sẵn sàng");
         }
         webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
@@ -1190,7 +1190,7 @@ public class OrderService {
 
         // Notify customer about order acceptance (using email)
         webSocketService.notifyCustomerOrderUpdate(order.getCustomer().getEmail(),
-                convertToResOrderDTO(order), "Your order has been accepted and is being prepared");
+                convertToResOrderDTO(order), "Đơn hàng đã được chấp nhận và đang được chuẩn bị");
 
         assignDriver(orderId);
 
@@ -1241,7 +1241,7 @@ public class OrderService {
                 : null;
         String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
         webSocketService.notifyCustomerOrderUpdate(customerEmail,
-                orderDTO, "Driver has accepted your order");
+                orderDTO, "Tài xế đã chấp nhận đơn hàng của bạn");
         webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
@@ -1456,7 +1456,7 @@ public class OrderService {
                 : null;
         String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
         webSocketService.notifyCustomerOrderUpdate(customerEmail,
-                orderDTO, "Your order has been picked up and is on the way");
+                orderDTO, "Tài xế đã nhận đơn hàng của bạn và đang trên đường giao hàng");
         webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
@@ -1500,7 +1500,7 @@ public class OrderService {
                 : null;
         String driverEmail = order.getDriver() != null ? order.getDriver().getEmail() : null;
         webSocketService.notifyCustomerOrderUpdate(customerEmail,
-                orderDTO, "Your order has arrived!");
+                orderDTO, "Tài xế đã đến nơi giao hàng!");
         webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmail);
 
         return orderDTO;
@@ -1571,7 +1571,7 @@ public class OrderService {
                 : null;
         String driverEmailNotify = order.getDriver() != null ? order.getDriver().getEmail() : null;
         webSocketService.notifyCustomerOrderUpdate(customerEmail,
-                orderDTO, "Your order has been delivered successfully!");
+                orderDTO, "Đơn hàng của bạn đã được giao thành công!");
         webSocketService.broadcastOrderStatusChange(orderDTO, customerEmail, restaurantEmail, driverEmailNotify);
 
         // After delivery, try to find and assign the next suitable order for this

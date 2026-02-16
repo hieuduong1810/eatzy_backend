@@ -51,7 +51,7 @@ public class WebSocketService {
         OrderNotification notification = new OrderNotification(
                 "NEW_ORDER",
                 order.getId(),
-                "New order received from customer",
+                "Có đơn hàng mới từ khách hàng",
                 order);
 
         sendToUser(ownerEmail, "/queue/orders", notification);
@@ -66,7 +66,7 @@ public class WebSocketService {
         OrderNotification notification = new OrderNotification(
                 "ORDER_ASSIGNED",
                 order.getId(),
-                "New order assigned to you",
+                "Có đơn hàng mới được giao cho bạn",
                 order);
 
         sendToUser(driverEmail, "/queue/orders", notification);
@@ -103,7 +103,7 @@ public class WebSocketService {
         OrderNotification notification = new OrderNotification(
                 "ORDER_STATUS_CHANGED",
                 order.getId(),
-                "Order status updated to: " + order.getOrderStatus(),
+                "Đơn hàng đã thay đổi trạng thái: " + order.getOrderStatus(),
                 order);
 
         // Notify customer
@@ -136,113 +136,3 @@ public class WebSocketService {
                 locationUpdate.getLatitude(),
                 locationUpdate.getLongitude());
     }
-
-    // ==================== LEGACY TOPIC-BASED METHODS (DEPRECATED)
-    // ====================
-    // These methods are kept for backward compatibility but should be replaced
-    // with user-specific methods above for security.
-
-    /**
-     * @deprecated Use {@link #notifyRestaurantNewOrder(String, ResOrderDTO)}
-     *             instead
-     */
-    @Deprecated
-    public void notifyRestaurantNewOrder(Long restaurantId, ResOrderDTO order) {
-        OrderNotification notification = new OrderNotification(
-                "NEW_ORDER",
-                order.getId(),
-                "New order received from customer",
-                order);
-
-        String destination = "/topic/restaurant/" + restaurantId + "/orders";
-        messagingTemplate.convertAndSend(destination, notification);
-        log.info("[DEPRECATED] Sent NEW_ORDER notification to restaurant {} at {}", restaurantId, destination);
-    }
-
-    /**
-     * @deprecated Use {@link #notifyDriverOrderAssigned(String, ResOrderDTO)}
-     *             instead
-     */
-    @Deprecated
-    public void notifyDriverOrderAssigned(Long driverId, ResOrderDTO order) {
-        OrderNotification notification = new OrderNotification(
-                "ORDER_ASSIGNED",
-                order.getId(),
-                "New order assigned to you",
-                order);
-
-        String destination = "/topic/driver/" + driverId + "/orders";
-        messagingTemplate.convertAndSend(destination, notification);
-        log.info("[DEPRECATED] Sent ORDER_ASSIGNED notification to driver {} at {}", driverId, destination);
-    }
-
-    /**
-     * @deprecated Use
-     *             {@link #notifyCustomerOrderUpdate(String, ResOrderDTO, String)}
-     *             instead
-     */
-    @Deprecated
-    public void notifyCustomerOrderUpdate(Long customerId, ResOrderDTO order, String message) {
-        OrderNotification notification = new OrderNotification(
-                "ORDER_UPDATE",
-                order.getId(),
-                message,
-                order);
-
-        String destination = "/topic/customer/" + customerId + "/orders";
-        messagingTemplate.convertAndSend(destination, notification);
-        log.info("[DEPRECATED] Sent ORDER_UPDATE notification to customer {} at {}", customerId, destination);
-    }
-
-    /**
-     * @deprecated Use
-     *             {@link #broadcastOrderStatusChange(ResOrderDTO, String, String, String)}
-     *             instead
-     */
-    @Deprecated
-    public void broadcastOrderStatusChange(ResOrderDTO order) {
-        OrderNotification notification = new OrderNotification(
-                "ORDER_STATUS_CHANGED",
-                order.getId(),
-                "Order status updated to: " + order.getOrderStatus(),
-                order);
-
-        // Notify customer
-        if (order.getCustomer() != null) {
-            messagingTemplate.convertAndSend(
-                    "/topic/customer/" + order.getCustomer().getId() + "/orders",
-                    notification);
-        }
-
-        // Notify restaurant
-        if (order.getRestaurant() != null) {
-            messagingTemplate.convertAndSend(
-                    "/topic/restaurant/" + order.getRestaurant().getId() + "/orders",
-                    notification);
-        }
-
-        // Notify driver if assigned
-        if (order.getDriver() != null) {
-            messagingTemplate.convertAndSend(
-                    "/topic/driver/" + order.getDriver().getId() + "/orders",
-                    notification);
-        }
-
-        log.info("[DEPRECATED] Broadcasted ORDER_STATUS_CHANGED for order {}", order.getId());
-    }
-
-    /**
-     * @deprecated Use
-     *             {@link #sendDriverLocationToCustomer(String, DriverLocationUpdate)}
-     *             instead
-     */
-    @Deprecated
-    public void broadcastDriverLocation(Long customerId, DriverLocationUpdate locationUpdate) {
-        String destination = "/topic/customer/" + customerId + "/driver-location";
-        messagingTemplate.convertAndSend(destination, locationUpdate);
-        log.debug("[DEPRECATED] Sent driver location to customer {} at {}: {}, {}",
-                customerId, destination,
-                locationUpdate.getLatitude(),
-                locationUpdate.getLongitude());
-    }
-}
