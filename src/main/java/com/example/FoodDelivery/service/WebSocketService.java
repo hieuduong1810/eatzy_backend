@@ -136,3 +136,4 @@ public class WebSocketService {
                 locationUpdate.getLatitude(),
                 locationUpdate.getLongitude());
     }
+}
