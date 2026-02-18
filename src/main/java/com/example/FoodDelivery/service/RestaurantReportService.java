@@ -257,15 +257,14 @@ public class RestaurantReportService {
                 // Sort by total revenue
                 dishAnalytics.sort((a, b) -> b.getTotalRevenue().compareTo(a.getTotalRevenue()));
 
-                // Get top 5 and low 2 performing dishes
+                // Get top 5 and improvement dishes (the rest)
                 List<MenuAnalyticsItemDTO> topSellingDishes = dishAnalytics.stream()
                                 .limit(5)
                                 .collect(Collectors.toList());
 
                 List<MenuAnalyticsItemDTO> lowPerformingDishes = dishAnalytics.stream()
-                                .skip(Math.max(0, dishAnalytics.size() - 2))
+                                .skip(5)
                                 .collect(Collectors.toList());
-                Collections.reverse(lowPerformingDishes);
 
                 // Calculate category breakdown
                 List<CategoryAnalyticsItemDTO> categoryBreakdown = calculateCategoryBreakdown(dishes, dishAnalytics);
