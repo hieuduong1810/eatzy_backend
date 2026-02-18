@@ -78,6 +78,7 @@ public class RestaurantReportService {
 
                 // Calculate totals
                 BigDecimal totalRevenue = orders.stream()
+                                .filter(o -> "DELIVERED".equals(o.getOrderStatus()))
                                 .map(o -> o.getSubtotal() != null ? o.getSubtotal() : BigDecimal.ZERO)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -177,25 +178,30 @@ public class RestaurantReportService {
                         BigDecimal netRevenue = BigDecimal.ZERO;
 
                         for (Order order : dayOrders) {
-                                foodRevenue = foodRevenue.add(
-                                                order.getSubtotal() != null ? order.getSubtotal() : BigDecimal.ZERO);
-                                deliveryFee = deliveryFee
-                                                .add(order.getDeliveryFee() != null ? order.getDeliveryFee()
-                                                                : BigDecimal.ZERO);
-                                discountAmount = discountAmount
-                                                .add(order.getDiscountAmount() != null ? order.getDiscountAmount()
-                                                                : BigDecimal.ZERO);
+                                // Only count revenue for delivered orders
+                                if ("DELIVERED".equals(order.getOrderStatus())) {
+                                        foodRevenue = foodRevenue.add(
+                                                        order.getSubtotal() != null ? order.getSubtotal()
+                                                                        : BigDecimal.ZERO);
+                                        deliveryFee = deliveryFee
+                                                        .add(order.getDeliveryFee() != null ? order.getDeliveryFee()
+                                                                        : BigDecimal.ZERO);
+                                        discountAmount = discountAmount
+                                                        .add(order.getDiscountAmount() != null
+                                                                        ? order.getDiscountAmount()
+                                                                        : BigDecimal.ZERO);
 
-                                OrderEarningsSummary summary = earningsByOrderId.get(order.getId());
-                                if (summary != null) {
-                                        commissionAmount = commissionAmount.add(
-                                                        summary.getRestaurantCommissionAmount() != null
-                                                                        ? summary.getRestaurantCommissionAmount()
-                                                                        : BigDecimal.ZERO);
-                                        netRevenue = netRevenue
-                                                        .add(summary.getRestaurantNetEarning() != null
-                                                                        ? summary.getRestaurantNetEarning()
-                                                                        : BigDecimal.ZERO);
+                                        OrderEarningsSummary summary = earningsByOrderId.get(order.getId());
+                                        if (summary != null) {
+                                                commissionAmount = commissionAmount.add(
+                                                                summary.getRestaurantCommissionAmount() != null
+                                                                                ? summary.getRestaurantCommissionAmount()
+                                                                                : BigDecimal.ZERO);
+                                                netRevenue = netRevenue
+                                                                .add(summary.getRestaurantNetEarning() != null
+                                                                                ? summary.getRestaurantNetEarning()
+                                                                                : BigDecimal.ZERO);
+                                        }
                                 }
                         }
 
