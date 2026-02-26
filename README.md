@@ -525,7 +525,7 @@ HTML test clients are available in `src/main/resources/static/`:
 
 <div align="center">
 
-**Built with ❤️ by Hoan Duong**
+**Built with ❤️ by Hieu Duong**
 
 [![Spring](https://img.shields.io/badge/Spring-6DB33F?style=flat&logo=spring&logoColor=white)](https://spring.io/)
 [![Java](https://img.shields.io/badge/Java-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://openjdk.org/)
