@@ -88,4 +88,39 @@ public class CustomerProfileController {
         customerProfileService.deleteCustomerProfile(id);
         return ResponseEntity.ok().body(null);
     }
+
+    // Endpoints for current logged-in user
+
+    @GetMapping("/customer-profile/me")
+    @ApiMessage("Get current user's customer profile")
+    public ResponseEntity<ResCustomerProfileDTO> getCurrentUserProfile() throws IdInvalidException {
+        CustomerProfile profile = customerProfileService.getCurrentUserProfile();
+        if (profile == null) {
+            throw new IdInvalidException("Customer profile not found for current user");
+        }
+        return ResponseEntity.ok(customerProfileService.convertToDTO(profile));
+    }
+
+    @PostMapping("/customer-profile/me")
+    @ApiMessage("Create customer profile for current user")
+    public ResponseEntity<ResCustomerProfileDTO> createCurrentUserProfile(@RequestBody CustomerProfile customerProfile)
+            throws IdInvalidException {
+        CustomerProfile createdProfile = customerProfileService.createCurrentUserProfile(customerProfile);
+        return ResponseEntity.status(HttpStatus.CREATED).body(customerProfileService.convertToDTO(createdProfile));
+    }
+
+    @PutMapping("/customer-profile/me")
+    @ApiMessage("Update current user's customer profile")
+    public ResponseEntity<ResCustomerProfileDTO> updateCurrentUserProfile(@RequestBody CustomerProfile customerProfile)
+            throws IdInvalidException {
+        CustomerProfile updatedProfile = customerProfileService.updateCurrentUserProfile(customerProfile);
+        return ResponseEntity.ok(customerProfileService.convertToDTO(updatedProfile));
+    }
+
+    @DeleteMapping("/customer-profile/me")
+    @ApiMessage("Delete current user's customer profile")
+    public ResponseEntity<Void> deleteCurrentUserProfile() throws IdInvalidException {
+        customerProfileService.deleteCurrentUserProfile();
+        return ResponseEntity.ok().body(null);
+    }
 }

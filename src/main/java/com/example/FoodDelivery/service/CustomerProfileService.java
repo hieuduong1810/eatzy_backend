@@ -14,6 +14,7 @@ import com.example.FoodDelivery.domain.User;
 import com.example.FoodDelivery.domain.res.ResultPaginationDTO;
 import com.example.FoodDelivery.domain.res.customerProfile.ResCustomerProfileDTO;
 import com.example.FoodDelivery.repository.CustomerProfileRepository;
+import com.example.FoodDelivery.util.SecurityUtil;
 import com.example.FoodDelivery.util.error.IdInvalidException;
 
 @Service
@@ -123,5 +124,79 @@ public class CustomerProfileService {
         }
 
         return dto;
+    }
+
+    // Methods for current logged-in user
+
+    public CustomerProfile getCurrentUserProfile() throws IdInvalidException {
+        String userEmail = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("No authenticated user found"));
+
+        User user = this.userService.handleGetUserByUsername(userEmail);
+        if (user == null) {
+            throw new IdInvalidException("User not found with email: " + userEmail);
+        }
+
+        return this.getCustomerProfileByUserId(user.getId());
+    }
+
+    public CustomerProfile createCurrentUserProfile(CustomerProfile customerProfile) throws IdInvalidException {
+        String userEmail = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("No authenticated user found"));
+
+        User user = this.userService.handleGetUserByUsername(userEmail);
+        if (user == null) {
+            throw new IdInvalidException("User not found with email: " + userEmail);
+        }
+
+        // Check if profile already exists for this user
+        if (this.existsByUserId(user.getId())) {
+            throw new IdInvalidException("Customer profile already exists for the current user");
+        }
+
+        customerProfile.setUser(user);
+        return customerProfileRepository.save(customerProfile);
+    }
+
+    public CustomerProfile updateCurrentUserProfile(CustomerProfile customerProfile) throws IdInvalidException {
+        String userEmail = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("No authenticated user found"));
+
+        User user = this.userService.handleGetUserByUsername(userEmail);
+        if (user == null) {
+            throw new IdInvalidException("User not found with email: " + userEmail);
+        }
+
+        CustomerProfile currentProfile = this.getCustomerProfileByUserId(user.getId());
+        if (currentProfile == null) {
+            throw new IdInvalidException("Customer profile not found for the current user");
+        }
+
+        // Update fields
+        if (customerProfile.getDateOfBirth() != null) {
+            currentProfile.setDateOfBirth(customerProfile.getDateOfBirth());
+        }
+        if (customerProfile.getHometown() != null) {
+            currentProfile.setHometown(customerProfile.getHometown());
+        }
+
+        return customerProfileRepository.save(currentProfile);
+    }
+
+    public void deleteCurrentUserProfile() throws IdInvalidException {
+        String userEmail = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("No authenticated user found"));
+
+        User user = this.userService.handleGetUserByUsername(userEmail);
+        if (user == null) {
+            throw new IdInvalidException("User not found with email: " + userEmail);
+        }
+
+        CustomerProfile currentProfile = this.getCustomerProfileByUserId(user.getId());
+        if (currentProfile == null) {
+            throw new IdInvalidException("Customer profile not found for the current user");
+        }
+
+        this.customerProfileRepository.deleteById(currentProfile.getId());
     }
 }
