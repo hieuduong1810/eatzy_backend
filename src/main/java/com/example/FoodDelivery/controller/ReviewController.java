@@ -89,6 +89,18 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
+    @GetMapping("/reviews/restaurant/{restaurantId}")
+    @ApiMessage("Get reviews by restaurant id")
+    public ResponseEntity<List<ResReviewDTO>> getReviewsByRestaurantId(@PathVariable("restaurantId") Long restaurantId)
+            throws IdInvalidException {
+        com.example.FoodDelivery.domain.Restaurant restaurant = restaurantService.getRestaurantById(restaurantId);
+        if (restaurant == null) {
+            throw new IdInvalidException("Restaurant not found with id: " + restaurantId);
+        }
+        List<ResReviewDTO> reviews = reviewService.getReviewsByTarget("restaurant", restaurant.getName());
+        return ResponseEntity.ok(reviews);
+    }
+
     @GetMapping("/reviews/target")
     @ApiMessage("Get reviews by target")
     public ResponseEntity<List<ResReviewDTO>> getReviewsByTarget(
