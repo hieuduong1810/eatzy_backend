@@ -38,6 +38,7 @@ public class ResFavouriteDTO {
         private String description;
         private BigDecimal averageRating;
         private String imageUrl;
+        private String status;
         private List<RestaurantType> restaurantTypes;
     }
 
