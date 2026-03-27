@@ -350,21 +350,12 @@ public class OrderService {
                 restaurant.getLatitude(),
                 restaurant.getLongitude());
 
-        // Calculate delivery fee using formula: F_base + D × R_km × K_surge
-        // Surge only applies to the distance-based fee, not the base fee
-        BigDecimal totalFee;
-        if (distance.compareTo(baseDistance) <= 0) {
-            // Within base distance, just charge base fee (no surge applied)
-            totalFee = baseFee;
-        } else {
-            // Extra distance beyond base
-            BigDecimal extraDistance = distance.subtract(baseDistance);
-            // Apply surge to distance component only: D × R_km × K_surge
-            BigDecimal surgedExtraFee = extraDistance.multiply(perKmFee).multiply(surgeMultiplier);
-            // Total = F_base + surged extra fee
-            totalFee = baseFee.add(surgedExtraFee)
-                    .setScale(0, java.math.RoundingMode.HALF_UP); // Round to whole VND
-        }
+        // Calculate delivery fee using formula: (F_base + D_extra × R_km) × K_surge
+        // Surge applies to the entire fee (base + distance component)
+        BigDecimal extraDistance = distance.subtract(baseDistance).max(BigDecimal.ZERO);
+        BigDecimal baseAndDistanceFee = baseFee.add(extraDistance.multiply(perKmFee));
+        BigDecimal totalFee = baseAndDistanceFee.multiply(surgeMultiplier)
+                .setScale(0, java.math.RoundingMode.HALF_UP); // Round to whole VND
 
         // Ensure minimum fee: totalFee = max(minFee, calculatedFee)
         if (totalFee.compareTo(minFee) < 0) {
@@ -373,8 +364,8 @@ public class OrderService {
 
         log.info("📦 Delivery Fee Calculation:");
         log.info("   Distance: {} km (base: {} km)", distance, baseDistance);
-        log.info("   Formula: F_base({}) + D({}) × R_km({}) × K_surge({})",
-                baseFee, distance.subtract(baseDistance).max(BigDecimal.ZERO), perKmFee, surgeMultiplier);
+        log.info("   Formula: (F_base({}) + D_extra({}) × R_km({})) × K_surge({})",
+                baseFee, extraDistance, perKmFee, surgeMultiplier);
         log.info("   Final fee: {} VND (min: {} VND)", totalFee, minFee);
 
         return totalFee;
