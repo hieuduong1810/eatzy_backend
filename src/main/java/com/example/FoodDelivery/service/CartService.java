@@ -69,6 +69,7 @@ public class CartService {
             restaurant.setName(cart.getRestaurant().getName());
             restaurant.setAddress(cart.getRestaurant().getAddress());
             restaurant.setImageUrl(cart.getRestaurant().getAvatarUrl());
+            restaurant.setStatus(cart.getRestaurant().getStatus());
             dto.setRestaurant(restaurant);
         }
 
